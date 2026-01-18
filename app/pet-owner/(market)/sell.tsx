@@ -1,3 +1,7 @@
+import { useAppContext } from "@/AppsProvider";
+import { uploadImageUri } from "@/helpers/cloudinary";
+import { add } from "@/helpers/db";
+import { storage } from "@/helpers/firebase";
 import { Colors } from "@/shared/colors/Colors";
 import HeaderWithActions from "@/shared/components/HeaderSet";
 import HeaderLayout from "@/shared/components/MainHeaderLayout";
@@ -5,6 +9,8 @@ import { screens } from "@/shared/styles/styles";
 import { Octicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
+import { serverTimestamp } from "firebase/firestore";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import React, { useState } from "react";
 import {
   FlatList,
@@ -68,31 +74,141 @@ const Sell = () => {
     setModalVisible(false);
   };
 
-  const handlePublish = () => {
-    if (
-      !images.length ||
-      !title ||
-      !price ||
-      !description ||
-      !category ||
-      !condition ||
-      !location
-    ) {
-      alert("Please fill all required fields.");
-      return;
-    }
 
-    console.log({
-      images,
-      title,
-      price,
+  const uploadImages = async () => {
+  const uploadedUrls: string[] = [];
+
+  for (const uri of images) {
+    // Convert local URI to blob
+    const response = await fetch(uri);
+    const blob = await response.blob();
+
+    // Create a unique path
+    const filename = `marketplace/${Date.now()}-${Math.random()
+      .toString(36)
+      .substring(2, 10)}`;
+
+    const imageRef = ref(storage, filename);
+    await uploadBytes(imageRef, blob);
+    const downloadURL = await getDownloadURL(imageRef);
+    uploadedUrls.push(downloadURL);
+  }
+
+  return uploadedUrls;
+};
+
+
+  const { userId, userName, userImagePath } = useAppContext();
+
+  // ... your existing state variables like images, title, price, etc.
+
+
+// const handlePublish = async () => {
+//   if (
+//     !images.length ||
+//     !title ||
+//     !price ||
+//     !description ||
+//     !category ||
+//     !condition
+//     //!location - for location
+//   ) {
+//     alert("Please fill all required fields.");
+//     return;
+//   }
+
+//   try {
+//     // 1️⃣ Upload images to Cloudinary
+//     const uploadedImages: string[] = [];
+//     for (const uri of images) {
+//       const url = await uploadImageUri(uri);
+//       uploadedImages.push(url);
+//     }
+
+//     // 2️⃣ Prepare the item data
+//     const newItem = {
+//       ownerId: userId,
+//       ownerName: userName,
+//       ownerImg: userImagePath ?? null,
+//       title,
+//       price: Number(price),
+//       category,
+//       condition,
+//       description,
+//       images: uploadedImages,
+//       location: location?.name || address || "Not specified",
+//       status: "available",
+//       createdAt: serverTimestamp(),
+//     };
+
+//     // 3️⃣ Save to Firestore (using your helper)
+//     await add("marketPlace").value(newItem);
+
+//     alert("Item published!");
+//     router.back();
+//   } catch (error) {
+//     console.log("Error publishing item:", error);
+//     alert("Failed to publish item. Try again.");
+//   }
+// };
+
+const handlePublish = async () => {
+  // 1️⃣ Validate required fields
+  if (
+    !images.length ||
+    !title.trim() ||
+    !price.trim() ||
+    !description.trim() ||
+    !category ||
+    !condition
+  ) {
+    alert("Please fill all required fields.");
+    return;
+  }
+
+  try {
+    // 2️⃣ Upload all selected images
+    const uploadedImages: string[] = await Promise.all(
+      images.map(async (uri) => {
+        if (!uri) return "";
+        const url = await uploadImageUri(uri); // your Cloudinary helper
+        return url;
+      })
+    );
+
+    // Remove any empty strings if upload failed
+    const finalImages = uploadedImages.filter((url) => url);
+
+    // 3️⃣ Prepare Firestore document
+    const newItem = {
+      ownerId: userId,
+      ownerName: userName,
+      ownerImg: userImagePath || null,
+      title: title.trim(),
+      price: Number(price),
       category,
       condition,
-      description,
-      location,
-    });
+      description: description.trim(),
+      images: finalImages, // ✅ Save as an array
+      location: location?.name || address || "Not specified",
+      status: "available",
+      createdAt: serverTimestamp(),
+    };
+
+    // 4️⃣ Save to Firestore
+    await add("marketPlace").value(newItem);
+
     alert("Item published!");
-  };
+
+    // 5️⃣ Navigate back to marketplace
+    router.push("/pet-owner/(tabs)/market-place");
+  } catch (error) {
+    console.error("Error publishing item:", error);
+    alert("Failed to publish item. Try again.");
+  }
+};
+
+
 
   const removeImage = (uri: string) => {
     setImages((prev) => prev.filter((img) => img !== uri));

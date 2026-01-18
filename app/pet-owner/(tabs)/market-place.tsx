@@ -1,10 +1,12 @@
+import { db } from "@/helpers/firebase";
 import { Colors } from "@/shared/colors/Colors";
 import HeaderLayout from "@/shared/components/MainHeaderLayout";
 import SkeletonMarketCard from "@/shared/components/MarketSkeleton";
 import { screens, ShadowStyle } from "@/shared/styles/styles";
 import { Feather, Octicons } from "@expo/vector-icons";
-import { Link, router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { Link, router, useFocusEffect } from "expo-router";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   FlatList,
   Image,
@@ -16,6 +18,7 @@ import {
   View,
 } from "react-native";
 
+
 const marketPlace = () => {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -23,14 +26,23 @@ const marketPlace = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [filterVisible, setFilterVisible] = useState(false);
 
-  const onRefresh = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-    }, 1500);
-  };
+  // const onRefresh = () => {
+  //   setLoading(true);
+  //   setTimeout(() => {
+  //     setLoading(false);
+  //   }, 1500);
+  // };
+
+   const onRefresh = async () => {
+  setRefreshing(true); // shows the pull-to-refresh spinner
+  await fetchMarketItems(); // actually fetch data from Firestore
+  setRefreshing(false); // hide the spinner
+};
+ 
+
 
   useEffect(() => {
+
     setTimeout(() => {
       onRefresh();
       setLoading(false);
@@ -40,57 +52,148 @@ const marketPlace = () => {
   // Categories
   const categories = ["Dogs", "Cats", "Food", "Accessories"];
 
-  // Sample market place items
-  const marketItems = [
-    {
-      id: "1",
-      name: "Golden Retriever Puppy",
-      price: 12000,
-      description: "Healthy 2-month-old Golden Retriever. Vaccinated.",
-      image: [  
-        "https://placekitten.com/400/300",
-        "https://placekitten.com/400/301",
-        "https://placekitten.com/400/302",
-        "https://placekitten.com/400/303",],
-      category: "Dogs",
-    },
-    {
-      id: "2",
-      name: "Cat Scratching Post",
-      price: 1500,
-      description: "Durable scratching post for cats. 3ft tall.",
-      image: ["https://placekitten.com/400/300", "https://placekitten.com/400/301", ],
-      category: "Accessories",
-    },
-    {
-      id: "3",
-      name: "Pet Food Pack",
-      price: 899,
-      description: "10kg premium dry dog food.",
-      image: "https://picsum.photos/400/300?random=10",
-      category: "Food",
-    },
-    {
-      id: "4",
-      name: "Persian Cat",
-      price: 8000,
-      description: "Pure breed Persian cat, 5 months old.",
-      image: "https://placekitten.com/400/301",
-      category: "Cats",
-    },
-  ];
+  // Sample market place items (Static)
+  // const marketItems = [
+  //   {
+  //     id: "1",
+  //     name: "Golden Retriever Puppy",
+  //     price: 12000,
+  //     description: "Healthy 2-month-old Golden Retriever. Vaccinated.",
+  //     image: [  
+  //       "https://placekitten.com/400/300",
+  //       "https://placekitten.com/400/301",
+  //       "https://placekitten.com/400/302",
+  //       "https://placekitten.com/400/303",],
+  //     category: "Dogs",
+  //   },
+  //   {
+  //     id: "2",
+  //     name: "Cat Scratching Post",
+  //     price: 1500,
+  //     description: "Durable scratching post for cats. 3ft tall.",
+  //     image: ["https://placekitten.com/400/300", "https://placekitten.com/400/301", ],
+  //     category: "Accessories",
+  //   },
+  //   {
+  //     id: "3",
+  //     name: "Pet Food Pack",
+  //     price: 899,
+  //     description: "10kg premium dry dog food.",
+  //     image: "https://picsum.photos/400/300?random=10",
+  //     category: "Food",
+  //   },
+  //   {
+  //     id: "4",
+  //     name: "Persian Cat",
+  //     price: 8000,
+  //     description: "Pure breed Persian cat, 5 months old.",
+  //     image: "https://placekitten.com/400/301",
+  //     category: "Cats",
+  //   },
+  // ];
+
+  useFocusEffect(
+  useCallback(() => {
+    fetchMarketItems();
+  }, [])
+);
+
+  const [marketItems, setMarketItems] = useState<any[]>([]);
+const fetchMarketItems = async () => {
+  try {
+    setLoading(true);
+
+    const postsRef = collection(db, "marketPlace");
+    const q = query(postsRef, where("status", "==", "available"));
+    const querySnapshot = await getDocs(q);
+
+    const items = querySnapshot.docs.map(doc => {
+      const data = doc.data();
+
+      // Normalize the images field (Firestore uses 'images')
+      let images: string[] = [];
+      if (Array.isArray(data.images) && data.images.length > 0) {
+        images = data.images;
+      } else if (typeof data.images === "string" && data.images.trim() !== "") {
+        images = [data.images];
+      } else if (data.images && typeof data.images === "object") {
+        images = Object.values(data.images).filter(url => typeof url === "string");
+      }
+
+      // Ensure there is always at least one image (optional fallback)
+      if (images.length === 0 && data.ownerImg) {
+        images = [data.ownerImg]; // fallback to owner image
+      }
+
+      return {
+        id: doc.id,
+        name: data.title || "No title",
+        description: data.description || "",
+        title: data.title || "",
+        category: data.category || "Uncategorized",
+        price: data.price || 0,
+        image: images, // ✅ array of images
+        ownerName: data.ownerName || "Unknown",
+        ownerImg: data.ownerImg || null,
+      };
+    });
+
+    setMarketItems(items);
+
+    console.log("Fetched marketplace items:", items);
+  } catch (error) {
+    console.log("Error fetching marketplace items:", error);
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+
+useEffect(() => {
+
+  fetchMarketItems();
+
+  
+}, []);
+
+
+
+
 
   // Filtered items by search + category
+  // const filteredItems = marketItems.filter(
+  //   (item) =>
+  //     (selectedCategory ? item.category === selectedCategory : true) &&
+  //     (item.name.toLowerCase().includes(search.toLowerCase()) ||
+  //       item.description.toLowerCase().includes(search.toLowerCase()))
+  // );
+
   const filteredItems = marketItems.filter(
-    (item) =>
-      (selectedCategory ? item.category === selectedCategory : true) &&
-      (item.name.toLowerCase().includes(search.toLowerCase()) ||
-        item.description.toLowerCase().includes(search.toLowerCase()))
-  );
+  (item) =>
+    (selectedCategory ? item.category === selectedCategory : true) &&
+    ((item.name?.toLowerCase() || "").includes(search.toLowerCase()) ||
+     (item.description?.toLowerCase() || "").includes(search.toLowerCase()))
+);
+
 
 const renderItem = ({ item }: { item: (typeof marketItems)[0] }) => {
-  // Get first image (if array)
-  const firstImage = Array.isArray(item.image) ? item.image[0] : item.image;
+  // Normalize image field
+  // Normalize image
+let firstImage: string = "";
+
+if (Array.isArray(item.image)) {
+  firstImage = item.image[0] || "";
+} else if (typeof item.image === "string") {
+  firstImage = item.image;
+} else if (item.image && typeof item.image === "object") {
+  // Convert object values to array and pick first
+  firstImage = Object.values(item.image)[0] as string || "";
+}
+
+// Fallback placeholder
+if (!firstImage) firstImage = "https://via.placeholder.com/150";
 
   return (
     <Pressable
@@ -103,15 +206,19 @@ const renderItem = ({ item }: { item: (typeof marketItems)[0] }) => {
             name: item.name,
             price: item.price,
             description: item.description,
-            image: Array.isArray(item.image) ? JSON.stringify(item.image) : item.image,
+            image: Array.isArray(item.image)
+              ? JSON.stringify(item.image)
+              : typeof item.image === "object"
+              ? JSON.stringify(Object.values(item.image))
+              : item.image,
             location: "Manila, Philippines",
-            seller: "John Doe",
-            sellerImage: "https://randomuser.me/api/portraits/men/32.jpg",
+            seller: item.ownerName,
+            sellerImage: item.ownerImg,
           },
         })
       }
     >
-      <Image source={{ uri: firstImage }} style={styles.cardImage} />
+      <Image source={{ uri: firstImage }} style={styles.cardImage} resizeMode="cover" />
       <View style={styles.cardContent}>
         <Text style={styles.itemName} numberOfLines={1}>
           {item.name}
@@ -124,6 +231,7 @@ const renderItem = ({ item }: { item: (typeof marketItems)[0] }) => {
     </Pressable>
   );
 };
+
 
   return (
     <View style={[screens.screen, { backgroundColor: Colors.background }]}>

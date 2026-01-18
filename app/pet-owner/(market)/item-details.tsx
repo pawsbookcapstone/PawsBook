@@ -1,4 +1,6 @@
+import { useAppContext } from "@/AppsProvider";
 import MapComponent from "@/components/MapComponent";
+import { saveItemForUser } from "@/helpers/savedItems";
 import { Colors } from "@/shared/colors/Colors";
 import HeaderWithActions from "@/shared/components/HeaderSet";
 import HeaderLayout from "@/shared/components/MainHeaderLayout";
@@ -33,6 +35,26 @@ const ItemDetails = () => {
       return [image];
     }
   })();
+
+
+  const { userId } = useAppContext(); // current logged-in user
+
+const handleSaveItem = async () => {
+  if (!userId) {
+    alert("You must be logged in to save items.");
+    return;
+  }
+
+  await saveItemForUser(userId, {
+    id: id as string,
+    title: name as string,
+    price: Number(price),
+    images: images as string[],
+    ownerId: seller as string,
+  });
+
+  alert("Item saved to your collection!");
+};
 
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
@@ -90,6 +112,7 @@ const ItemDetails = () => {
         <View style={styles.actionRow}>
           <Pressable
             style={[styles.Button, { backgroundColor: Colors.buttonlogin }]}
+            onPress={handleSaveItem}
           >
             <FontAwesome name="bookmark" size={20} color={"#000"} />
             <Text style={[styles.buttonText, { color: "#000" }]}>Save</Text>

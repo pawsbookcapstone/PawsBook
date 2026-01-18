@@ -3,8 +3,8 @@ import HeaderWithActions from "@/shared/components/HeaderSet";
 import HeaderLayout from "@/shared/components/MainHeaderLayout";
 import { screens, ShadowStyle } from "@/shared/styles/styles";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import React, { useState } from "react";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
   Dimensions,
   FlatList,
@@ -13,16 +13,13 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 
-type PostItem = {
-  id: string;
-  title: string;
-  images: string[];
-  description: string;
-  time: string;
-};
+import { useAppContext } from "@/AppsProvider";
+import { db } from "@/helpers/firebase";
+import { collection, getDocs, orderBy, query } from "firebase/firestore";
+
 
 type MarketplaceItem = {
   id: string;
@@ -32,66 +29,88 @@ type MarketplaceItem = {
   description: string;
 };
 
+type PostItem = {
+  id: string;
+  title: string;
+  images: string[];
+  description: string;
+  time: string;
+};
+
 type SavedItem = PostItem | MarketplaceItem;
 
-const dummyPosts: PostItem[] = [
-  {
-    id: "1",
-    title: "Cute Puppy Moments",
-    images: [
-      "https://placedog.net/400/300?id=1",
-      "https://placedog.net/400/301?id=2",
-      "https://placedog.net/400/302?id=3",
-      "https://placedog.net/400/303?id=4",
-    ],
-    description: "Watch these adorable pups having fun at the park!",
-    time: "2h ago",
-  },
-  {
-    id: "2",
-    title: "Funny Cat Series",
-    images: [
-      "https://placekitten.com/400/300",
-      "https://placekitten.com/401/300",
-      "https://placekitten.com/402/300",
-    ],
-    description: "These cats never fail to make me laugh 😂",
-    time: "5h ago",
-  },
-];
-
-const dummyMarketplace: MarketplaceItem[] = [
-  {
-    id: "1",
-    name: "Pet Collar Set",
-    price: "$20",
-    images: [
-      "https://placedog.net/400/300?id=5",
-      "https://placedog.net/401/300?id=6",
-    ],
-    description: "Stylish and comfy collars for your pets 🐾",
-  },
-  {
-    id: "2",
-    name: "Cat Scratcher",
-    price: "$25",
-    images: [
-      "https://placekitten.com/400/301",
-      "https://placekitten.com/400/302",
-      "https://placekitten.com/400/303",
-    ],
-    description: "Keep your cat happy and your furniture safe!",
-  },
-];
-
 const Saved = () => {
+  const router = useRouter();
+  const { userId } = useAppContext();
+
   const [activeTab, setActiveTab] = useState<"Posts" | "Marketplace">("Posts");
-  const [posts, setPosts] = useState(dummyPosts);
-  const [marketplace, setMarketplace] = useState(dummyMarketplace);
+
+  const [posts, setPosts] = useState<PostItem[]>([]);
+  const [marketplace, setMarketplace] = useState<MarketplaceItem[]>([]);
+
+  const [loadingPosts, setLoadingPosts] = useState(true);
+  const [loadingMarketplace, setLoadingMarketplace] = useState(true);
 
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [selectedPostImages, setSelectedPostImages] = useState<string[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const screenWidth = Dimensions.get("window").width;
+
+  // Fetch saved marketplace items
+  useEffect(() => {
+    const fetchSavedMarketplace = async () => {
+      if (!userId) return;
+
+      try {
+        setLoadingMarketplace(true);
+        const savedRef = collection(db, "users", userId, "savedItems");
+        const q = query(savedRef, orderBy("savedAt", "desc"));
+        const snapshot = await getDocs(q);
+
+        const items: MarketplaceItem[] = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.title || "No title",
+            price: data.price ? String(data.price) : "$0",
+            images: Array.isArray(data.images) ? data.images : [],
+            description: data.description || "",
+          };
+        });
+
+        setMarketplace(items);
+      } catch (error) {
+        console.error("Error fetching saved marketplace items:", error);
+      } finally {
+        setLoadingMarketplace(false);
+      }
+    };
+
+    fetchSavedMarketplace();
+  }, [userId]);
+
+  // Placeholder posts fetch - replace with your own logic if you have saved posts
+  useEffect(() => {
+    const fetchSavedPosts = async () => {
+      setLoadingPosts(true);
+      try {
+        // Example: fetch from "users/{userId}/savedPosts"
+        // const postsRef = collection(db, "users", userId, "savedPosts");
+        // const snapshot = await getDocs(postsRef);
+        // const data: PostItem[] = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+        // setPosts(data);
+
+        setPosts([]); // empty for now
+      } catch (error) {
+        console.error("Error fetching saved posts:", error);
+      } finally {
+        setLoadingPosts(false);
+      }
+    };
+
+    fetchSavedPosts();
+  }, [userId]);
 
   const openImageModal = (images: string[], index: number) => {
     setSelectedPostImages(images);
@@ -100,8 +119,8 @@ const Saved = () => {
   };
 
   const removeItem = (id: string) => {
-    if (activeTab === "Posts") setPosts(posts.filter((p) => p.id !== id));
-    else setMarketplace(marketplace.filter((m) => m.id !== id));
+    if (activeTab === "Posts") setPosts(posts.filter(p => p.id !== id));
+    else setMarketplace(marketplace.filter(m => m.id !== id));
   };
 
   const renderItem = ({ item }: { item: SavedItem }) => {
@@ -110,40 +129,34 @@ const Saved = () => {
         ? (item as PostItem).images
         : (item as MarketplaceItem).images;
 
-    const maxImagesToShow = 4;
-    const extraImages = images.length - maxImagesToShow;
-
     return (
       <View style={styles.card}>
-        {/* 🧩 Image Grid */}
- {/* 🧩 Image Grid */}
-{images.length > 0 && (
-  <View style={styles.imageGrid}>
-    {images.slice(0, 3).map((img, idx) => {
-      const extraImages = images.length - 3;
-      return (
-        <TouchableOpacity
-          key={idx}
-          style={styles.imageWrapper}
-          onPress={() => openImageModal(images, idx)}
-          activeOpacity={0.8}
-        >
-          <Image
-            source={{ uri: img }}
-            style={styles.gridImage}
-            resizeMode="cover"
-          />
-          {idx === 2 && extraImages > 0 && (
-            <View style={styles.overlay}>
-              <Text style={styles.overlayText}>+{extraImages}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      );
-    })}
-  </View>
-)}
-
+        {images.length > 0 && (
+          <View style={styles.imageGrid}>
+            {images.slice(0, 3).map((img, idx) => {
+              const extraImages = images.length - 3;
+              return (
+                <TouchableOpacity
+                  key={idx}
+                  style={styles.imageWrapper}
+                  onPress={() => openImageModal(images, idx)}
+                  activeOpacity={0.8}
+                >
+                  <Image
+                    source={{ uri: img }}
+                    style={styles.gridImage}
+                    resizeMode="cover"
+                  />
+                  {idx === 2 && extraImages > 0 && (
+                    <View style={styles.overlay}>
+                      <Text style={styles.overlayText}>+{extraImages}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
 
         <View style={styles.content}>
           <Text style={styles.title}>
@@ -152,16 +165,10 @@ const Saved = () => {
               : (item as MarketplaceItem).name}
           </Text>
           <Text style={styles.description}>{item.description}</Text>
-
-          {activeTab === "Posts" && (
-            <Text style={styles.time}>{(item as PostItem).time}</Text>
-          )}
-          {activeTab === "Marketplace" && (
-            <Text style={styles.price}>{(item as MarketplaceItem).price}</Text>
-          )}
+          {activeTab === "Posts" && <Text style={styles.time}>{(item as PostItem).time}</Text>}
+          {activeTab === "Marketplace" && <Text style={styles.price}>{(item as MarketplaceItem).price}</Text>}
         </View>
 
-        {/* 🗑️ Trash Button */}
         <TouchableOpacity
           style={styles.trashButton}
           onPress={() => removeItem(item.id)}
@@ -188,28 +195,15 @@ const Saved = () => {
           style={[styles.tabButton, activeTab === "Posts" && styles.activeTab]}
           onPress={() => setActiveTab("Posts")}
         >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "Posts" && styles.activeTabText,
-            ]}
-          >
+          <Text style={[styles.tabText, activeTab === "Posts" && styles.activeTabText]}>
             Posts
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === "Marketplace" && styles.activeTab,
-          ]}
+          style={[styles.tabButton, activeTab === "Marketplace" && styles.activeTab]}
           onPress={() => setActiveTab("Marketplace")}
         >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "Marketplace" && styles.activeTabText,
-            ]}
-          >
+          <Text style={[styles.tabText, activeTab === "Marketplace" && styles.activeTabText]}>
             Marketplace
           </Text>
         </TouchableOpacity>
@@ -218,20 +212,18 @@ const Saved = () => {
       {/* List */}
       <FlatList
         data={activeTab === "Posts" ? posts : marketplace}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         renderItem={renderItem}
         contentContainerStyle={{ padding: 16, paddingBottom: 30 }}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
-              No saved items in this category.
-            </Text>
+            <Text style={styles.emptyText}>No saved items in this category.</Text>
           </View>
         }
       />
 
-      {/* 🖼️ Modal Viewer */}
+      {/* Image Modal */}
       {imageModalVisible && (
         <Modal visible={imageModalVisible} transparent>
           <View style={styles.modalBackground}>
@@ -248,11 +240,7 @@ const Saved = () => {
               keyExtractor={(_, i) => i.toString()}
               renderItem={({ item }) => (
                 <View style={styles.fullImageWrapper}>
-                  <Image
-                    source={{ uri: item }}
-                    style={styles.fullImage}
-                    resizeMode="contain"
-                  />
+                  <Image source={{ uri: item }} style={styles.fullImage} resizeMode="contain" />
                 </View>
               )}
             />
@@ -306,35 +294,34 @@ const styles = StyleSheet.create({
     ...ShadowStyle,
   },
   imageGrid: {
-  flexDirection: "row",
-  flexWrap: "wrap",
-  gap: 5,
-  marginTop: 10,
-  paddingHorizontal: 10,
-},
-imageWrapper: {
-  width: "32%",
-  aspectRatio: 1,
-  borderRadius: 8,
-  overflow: "hidden",
-  position: "relative",
-},
-gridImage: {
-  width: "100%",
-  height: "100%",
-},
-overlay: {
-  ...StyleSheet.absoluteFillObject,
-  backgroundColor: "rgba(0,0,0,0.5)",
-  justifyContent: "center",
-  alignItems: "center",
-},
-overlayText: {
-  color: "white",
-  fontSize: 18,
-  fontWeight: "600",
-},
-
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5,
+    marginTop: 10,
+    paddingHorizontal: 10,
+  },
+  imageWrapper: {
+    width: "32%",
+    aspectRatio: 1,
+    borderRadius: 8,
+    overflow: "hidden",
+    position: "relative",
+  },
+  gridImage: {
+    width: "100%",
+    height: "100%",
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  overlayText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "600",
+  },
   content: {
     padding: 16,
   },
