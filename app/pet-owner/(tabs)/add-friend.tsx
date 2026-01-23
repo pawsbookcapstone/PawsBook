@@ -25,39 +25,7 @@ const addFriend = () => {
   const [status, setStatus] = useState<Record<string, string>>({});
   const [refreshing, setRefreshing] = useState(false);
 
-  const [friendRequests, setFriendRequests] = useState<any>([
-    // {
-    //   id: "1",
-    //   name: "Jane Smith",
-    //   profilePic: "https://randomuser.me/api/portraits/women/44.jpg",
-    //   time: "2h ago",
-    //   mutualFriends: 3,
-    //   mutualFriendImages: [
-    //     "https://randomuser.me/api/portraits/men/12.jpg",
-    //     "https://randomuser.me/api/portraits/women/33.jpg",
-    //     "https://randomuser.me/api/portraits/men/56.jpg",
-    //   ],
-    // },
-    // {
-    //   id: "2",
-    //   name: "Michael Johnson",
-    //   profilePic: "https://randomuser.me/api/portraits/men/32.jpg",
-    //   time: "5h ago",
-    //   mutualFriends: 0,
-    //   mutualFriendImages: [],
-    // },
-    // {
-    //   id: "3",
-    //   name: "Emily Davis",
-    //   profilePic: "https://randomuser.me/api/portraits/women/68.jpg",
-    //   time: "1d ago",
-    //   mutualFriends: 2,
-    //   mutualFriendImages: [
-    //     "https://randomuser.me/api/portraits/women/21.jpg",
-    //     "https://randomuser.me/api/portraits/men/40.jpg",
-    //   ],
-    // },
-  ]);
+  const [friendRequests, setFriendRequests] = useState<any>([]);
 
   useEffect(() => {
     onRefresh();
@@ -107,35 +75,11 @@ const addFriend = () => {
       setFriendRequests(_friendRequestsData);
     } catch (e) {
       Alert.alert("Error", e + "");
+      console.log(e);
     } finally {
       setRefreshing(false);
     }
   };
-  // const onRefresh = async () => {
-  //   setRefreshing(true);
-  //   try {
-  //     const snap = await get("friends").where(
-  //       where("users", "array-contains", userId),
-  //       where("requested_by_id", "!=", userId),
-  //       where("confirmed", "==", false)
-  //     );
-
-  //     setFriendRequests(
-  //       snap.docs.map((_friend: any) => {
-  //         const d = _friend.data();
-  //         return {
-  //           id: _friend.id,
-  //           other_user: d.details[d.users[0]],
-  //           time: computeTimePassed(d.date_requested.toDate()),
-  //         };
-  //       })
-  //     );
-  //   } catch (e) {
-  //     Alert.alert("Error", e + "");
-  //   } finally {
-  //     setRefreshing(false);
-  //   }
-  // };
 
   const handleConfirm = (id: string) => {
     // setStatus((prev) => ({ ...prev, [id]: "confirmed" }));

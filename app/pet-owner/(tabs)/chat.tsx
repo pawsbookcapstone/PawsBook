@@ -153,7 +153,7 @@ const Chat = () => {
     const messageQuery = query(
       collection(db, "chats"),
       where("users", "array-contains", userId),
-      orderBy("last_sent_at", "desc")
+      orderBy("last_sent_at", "desc"),
     );
     const unsubscribe = onSnapshot(messageQuery, (snapshot) => {
       setMessages(
@@ -166,7 +166,7 @@ const Chat = () => {
             last_message: t.last_message,
             time: computeTimePassed(t.last_sent_at?.toDate()),
           };
-        })
+        }),
       );
     });
 

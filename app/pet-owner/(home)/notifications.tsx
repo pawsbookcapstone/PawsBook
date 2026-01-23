@@ -1,3 +1,5 @@
+import { useAppContext } from "@/AppsProvider";
+import { get, where } from "@/helpers/db";
 import { Colors } from "@/shared/colors/Colors";
 import HeaderWithActions from "@/shared/components/HeaderSet";
 import HeaderLayout from "@/shared/components/MainHeaderLayout";
@@ -53,9 +55,18 @@ const notificationsData = [
     time: "2025-09-15T10:00:00Z",
   },
 ];
+type NotificationItem = {
+  id: string;
+  name: string;
+  profile: string;
+  description: string;
+  type: "like" | "comment" | "friend_request" | "mention" | "info";
+  time: string; // ISO string
+};
 
 const Notifications = () => {
-  const [data, setData] = useState(notificationsData);
+  const [data, setData] = useState<NotificationItem[]>([]);
+
   const [selected, setSelected] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -64,35 +75,60 @@ const Notifications = () => {
     y: number;
   } | null>(null);
 
-  const onRefresh = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setData(notificationsData);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchNotifications();
+    setRefreshing(false);
+  };
+
+  const { userId } = useAppContext();
+  const fetchNotifications = async () => {
+    try {
+      setLoading(true);
+
+      const snapshot = await get("notifications").where(
+        where("userId", "==", userId),
+      );
+
+      const notifications = snapshot.docs.map((doc) => {
+        const data = doc.data();
+
+        return {
+          id: doc.id,
+          name: data.name || "Unknown",
+          profile: data.profile || "",
+          description: data.description || "",
+          type: data.type || "info",
+          time: data.time?.toDate
+            ? data.time.toDate().toISOString()
+            : new Date().toISOString(),
+        };
+      });
+
+      setData(notifications);
+    } catch (error) {
+      console.log("Error fetching notifications:", error);
+    } finally {
       setLoading(false);
-    }, 2000);
+    }
   };
 
   useEffect(() => {
-    // simulate API call
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 2000);
-
-    return () => clearTimeout(timer);
+    fetchNotifications();
   }, []);
 
   // Sort notifications latest first
   const sortedNotifications = useMemo(() => {
     return [...data].sort(
-      (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()
+      (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime(),
     );
   }, [data]);
 
   const latest = sortedNotifications.filter(
-    (n) => new Date(n.time) > new Date(Date.now() - 24 * 60 * 60 * 1000)
+    (n) => new Date(n.time) > new Date(Date.now() - 24 * 60 * 60 * 1000),
   );
   const previous = sortedNotifications.filter(
-    (n) => new Date(n.time) <= new Date(Date.now() - 24 * 60 * 60 * 1000)
+    (n) => new Date(n.time) <= new Date(Date.now() - 24 * 60 * 60 * 1000),
   );
 
   const handleDelete = (id: string) => {
@@ -112,8 +148,8 @@ const Notifications = () => {
                 : "You declined the request",
               type: "info",
             }
-          : n
-      )
+          : n,
+      ),
     );
   };
 

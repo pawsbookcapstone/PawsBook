@@ -19,11 +19,11 @@ import {
 } from "react-native";
 
 const Login = () => {
-  const [email, setemail] = useState("admin@admin.com");
-  const [password, setpassword] = useState("password");
+  // const [email, setemail] = useState("admin@admin.com");
+  // const [password, setpassword] = useState("password");
   //ad's account
-  //   const [email, setemail] = useState("adrianfegalan@gmail.com");
-  // const [password, setpassword] = useState("PASSWORD");
+  const [email, setemail] = useState("adrianfegalan@gmail.com");
+  const [password, setpassword] = useState("PASSWORD");
   const [showPassword, setShowPassword] = useState(false);
 
   const {
@@ -48,7 +48,7 @@ const Login = () => {
       const userCredential = await signInWithEmailAndPassword(
         auth,
         email,
-        password
+        password,
       );
 
       const userDoc = await find("users", userCredential.user.uid);

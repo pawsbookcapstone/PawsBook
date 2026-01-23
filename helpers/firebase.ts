@@ -22,14 +22,24 @@ const firebaseConfig = {
 
 
 //Adrian's DB
-  apiKey: "AIzaSyAJveK2TG1IyflZcU6RSGAALytu4F2sNLc",
-  authDomain: "pawsbook-381c5.firebaseapp.com",
-  projectId: "pawsbook-381c5",
-  storageBucket: "pawsbook-381c5.firebasestorage.app",
-  messagingSenderId: "1096411527587",
-  appId: "1:1096411527587:web:10f0db8d23378b79bec216",
-  measurementId: "G-M560MX0D98"
+  // apiKey: "AIzaSyAJveK2TG1IyflZcU6RSGAALytu4F2sNLc",
+  // authDomain: "pawsbook-381c5.firebaseapp.com",
+  // projectId: "pawsbook-381c5",
+  // storageBucket: "pawsbook-381c5.firebasestorage.app",
+  // messagingSenderId: "1096411527587",
+  // appId: "1:1096411527587:web:10f0db8d23378b79bec216",
+  // measurementId: "G-M560MX0D98"
 
+
+  //official db
+   apiKey: "AIzaSyAVJYhymEz8HjG9NCMH1--Q3cK4kDyT4Pc",
+  authDomain: "pawsbook-56ab9.firebaseapp.com",
+  projectId: "pawsbook-56ab9",
+  storageBucket: "pawsbook-56ab9.firebasestorage.app",
+  messagingSenderId: "409035285876",
+  appId: "1:409035285876:web:447c08cc880a83c2a2f821",
+  measurementId: "G-0116N56Q6Q",
+  databaseURL: "https://pawsbook-56ab9-default-rtdb.firebaseio.com", 
 };
 
 const app = initializeApp(firebaseConfig);
