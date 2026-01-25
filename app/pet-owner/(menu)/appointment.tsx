@@ -1,3 +1,4 @@
+import { all, update } from "@/helpers/db";
 import { Colors } from "@/shared/colors/Colors";
 import { AppointmentSkeleton } from "@/shared/components/AppointmentSkeletal";
 import HeaderWithActions from "@/shared/components/HeaderSet";
@@ -82,7 +83,7 @@ const Appointment = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [appointments, setAppointments] = useState(dummyAppointments);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [search, setSearch] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<
@@ -90,23 +91,84 @@ const Appointment = () => {
   >(null);
   const [activeTab, setActiveTab] = useState("All");
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    setIsLoading(true);
-    // Simulate fetching new data
-    setTimeout(() => {
-      setAppointments(dummyAppointments); // Replace with real API call if needed
-      setRefreshing(false);
-      setIsLoading(false);
-    }, 1500);
-  };
+  // const onRefresh = () => {
+  //   setRefreshing(true);
+  //   setIsLoading(true);
+  //   // Simulate fetching new data
+  //   setTimeout(() => {
+  //     setAppointments(dummyAppointments); // Replace with real API call if needed
+  //     setRefreshing(false);
+  //     setIsLoading(false);
+  //   }, 1500);
+  // };
 
   // Example: simulate data loading
+  // React.useEffect(() => {
+  //   const timer = setTimeout(() => {
+  //     setIsLoading(false);
+  //   }, 2000); // simulate 2s loading
+  //   return () => clearTimeout(timer);
+  // }, []);
+
+  //bagong code
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const snapshot = await all("appointments");
+      const data = snapshot.docs.map((doc) => {
+        const d = doc.data() as any;
+        return {
+          id: doc.id,
+          type: d.type,
+          petName: d.petName,
+          date: d.selectedDate
+            ? new Date(d.selectedDate.seconds * 1000).toDateString()
+            : "",
+          time: d.selectedTime || "",
+          status: d.status,
+          providerName: d.providerName,
+          providerAvatar: d.providerAvatar,
+          location: d.location || "To be confirmed",
+        };
+      });
+      setAppointments(data);
+    } catch (error) {
+      console.error("Failed to refresh appointments:", error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   React.useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 2000); // simulate 2s loading
-    return () => clearTimeout(timer);
+    const fetchAppointments = async () => {
+      try {
+        setIsLoading(true);
+        const snapshot = await all("appointments"); // get all appointments
+        const data = snapshot.docs.map((doc) => {
+          const d = doc.data() as any;
+          return {
+            id: doc.id,
+            type: d.type,
+            petName: d.petName,
+            date: d.selectedDate
+              ? new Date(d.selectedDate.seconds * 1000).toDateString()
+              : "",
+            time: d.selectedTime || "",
+            status: d.status,
+            providerName: d.providerName,
+            providerAvatar: d.providerAvatar,
+            location: d.location || "To be confirmed",
+          };
+        });
+        setAppointments(data);
+      } catch (error) {
+        console.error("Failed to fetch appointments:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAppointments();
   }, []);
 
   const filteredAppointments = appointments.filter((a) => {
@@ -119,18 +181,40 @@ const Appointment = () => {
     return matchesSearch && matchesTab;
   });
 
-  const cancelAppointment = (reason: string) => {
-    if (selectedAppointmentId) {
+  const cancelAppointment = async (reason: string) => {
+    if (!selectedAppointmentId) return;
+
+    try {
+      await update("appointments", selectedAppointmentId).value({
+        status: "Cancelled",
+        cancellationReason: reason,
+      });
+
       setAppointments((prev) =>
         prev.map((a) =>
-          a.id === selectedAppointmentId ? { ...a, status: "Cancelled" } : a
-        )
+          a.id === selectedAppointmentId ? { ...a, status: "Cancelled" } : a,
+        ),
       );
+
       setSelectedAppointmentId(null);
       setModalVisible(false);
-      console.log("Cancelled for reason:", reason);
+    } catch (error) {
+      console.error("Failed to cancel appointment:", error);
     }
   };
+
+  // const cancelAppointment = (reason: string) => {
+  //   if (selectedAppointmentId) {
+  //     setAppointments((prev) =>
+  //       prev.map((a) =>
+  //         a.id === selectedAppointmentId ? { ...a, status: "Cancelled" } : a,
+  //       ),
+  //     );
+  //     setSelectedAppointmentId(null);
+  //     setModalVisible(false);
+  //     console.log("Cancelled for reason:", reason);
+  //   }
+  // };
 
   const renderItem = ({ item }: { item: Appointment }) => (
     <Pressable
@@ -160,8 +244,8 @@ const Appointment = () => {
               item.status === "Upcoming"
                 ? { backgroundColor: "#E0F2FF" }
                 : item.status === "Completed"
-                ? { backgroundColor: "#E6FFED" }
-                : { backgroundColor: "#FFE6E6" },
+                  ? { backgroundColor: "#E6FFED" }
+                  : { backgroundColor: "#FFE6E6" },
             ]}
           >
             <Text
@@ -170,8 +254,8 @@ const Appointment = () => {
                 item.status === "Upcoming"
                   ? { color: Colors.primary }
                   : item.status === "Completed"
-                  ? { color: "green" }
-                  : { color: "red" },
+                    ? { color: "green" }
+                    : { color: "red" },
               ]}
             >
               {item.status}
@@ -485,9 +569,10 @@ const Appointment = () => {
                       prev.map((a) =>
                         a.id === selectedAppointmentId
                           ? { ...a, status: "Cancelled" }
-                          : a
-                      )
+                          : a,
+                      ),
                     );
+                    cancelAppointment(selectedReason);
                     setSelectedAppointmentId(null);
                     setSelectedReason(null);
                     setConfirmVisible(false);

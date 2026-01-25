@@ -1,3 +1,6 @@
+import { useAppContext } from "@/AppsProvider";
+import { uploadImageUri } from "@/helpers/cloudinary";
+import { add, serverTimestamp } from "@/helpers/db";
 import { Colors } from "@/shared/colors/Colors";
 import HeaderWithActions from "@/shared/components/HeaderSet";
 import HeaderLayout from "@/shared/components/MainHeaderLayout";
@@ -20,6 +23,54 @@ const CreateLostFoundPost = () => {
   const [images, setImages] = useState<string[]>([]);
   const [caption, setCaption] = useState("");
   const [type, setType] = useState<"Lost" | "Found">("Lost");
+
+  //bagong code
+  //bagong code
+  const { userId, userName, userImagePath } = useAppContext();
+  const createLostFound = async () => {
+    // console.log(providerId, providerImage, providerName);
+    // if (!petName || !contactNumber || !selectedDate || !selectedTime) {
+    //   alert("Please complete all fields");
+    //   return;
+    // }
+
+    try {
+      const uploadedImages: string[] = await Promise.all(
+        images.map(async (uri) => {
+          if (!uri) return "";
+          const url = await uploadImageUri(uri);
+          return url;
+        }),
+      );
+
+      const finalImages = uploadedImages.filter((url) => url);
+
+      await add("lost-and-found").value({
+        type: type,
+        caption: caption,
+        userId: userId,
+        userName: userName,
+        userImage: userImagePath,
+        createdAt: serverTimestamp(),
+        petImages: finalImages,
+        // ownerId:fin user.uid   // add later if needed
+      });
+      console.log("Post Created:", {
+        images,
+        caption,
+        type,
+        userId,
+        userName,
+        userImagePath,
+      });
+      router.replace("/pet-owner/(menu)/lost-found");
+    } catch (error) {
+      console.error("Failed to create appointment:", error);
+      alert("Something went wrong. Please try again.");
+    } finally {
+      // setLoading(false);
+    }
+  };
 
   const pickImages = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -112,7 +163,7 @@ const CreateLostFoundPost = () => {
         {/* Post Button */}
         <Pressable
           style={[styles.postBtn, { opacity: caption ? 1 : 0.7 }]}
-          onPress={handlePost}
+          onPress={createLostFound}
           disabled={!caption}
         >
           <Text style={styles.postBtnText}>Post</Text>

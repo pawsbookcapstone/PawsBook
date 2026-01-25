@@ -1,3 +1,4 @@
+import { add, serverTimestamp } from "@/helpers/db";
 import { Colors } from "@/shared/colors/Colors";
 import HeaderWithActions from "@/shared/components/HeaderSet";
 import HeaderLayout from "@/shared/components/MainHeaderLayout";
@@ -24,6 +25,57 @@ const SetAppointment = () => {
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false); // <-- New state
+
+  //new code ito
+  const { providerId, providerName, providerType, providerImage } =
+    useLocalSearchParams();
+  const [petName, setPetName] = useState("");
+  // const [date, setDate] = useState("");
+  // // const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  // const [time, setTime] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // const providerTypeParam = providerType as string | undefined;
+
+  // if (!providerTypeParam) {
+  //   alert(
+  //     "Provider type not found. Please go back and select a provider again.",
+  //   );
+  //   return;
+  // }
+
+  const createAppointment = async () => {
+    console.log(providerId, providerImage, providerName);
+    if (!petName || !contactNumber || !selectedDate || !selectedTime) {
+      alert("Please complete all fields");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      await add("appointments").value({
+        type: providerType,
+        petName,
+        selectedDate,
+        selectedTime,
+        status: "Upcoming",
+        providerId,
+        providerName,
+        providerAvatar: providerImage,
+        location: "To be confirmed",
+        createdAt: serverTimestamp(),
+        // ownerId: user.uid   // add later if needed
+      });
+
+      router.replace("/pet-owner/(menu)/appointment");
+    } catch (error) {
+      console.error("Failed to create appointment:", error);
+      alert("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const timeSlots = Array.from({ length: 10 }, (_, i) => 8 + i)
     .filter((hour) => hour !== 12)
@@ -54,27 +106,27 @@ const SetAppointment = () => {
     }
   };
 
-  const handleConfirm = () => {
-    if (!fullName || !contactNumber || !selectedDate || !selectedTime) {
-      alert("Please fill all fields and select date/time");
-      return;
-    }
+  // const handleConfirm = () => {
+  //   if (!fullName || !contactNumber || !selectedDate || !selectedTime) {
+  //     alert("Please fill all fields and select date/time");
+  //     return;
+  //   }
 
-    setIsSubmitting(true); // Disable the button immediately
+  //   setIsSubmitting(true); // Disable the button immediately
 
-    // Optional: simulate a delay (e.g., 1 second) before navigating
-    setTimeout(() => {
-      router.push({
-        pathname: "/usable/success-screen",
-        params: {
-          name: fullName,
-          provider: name,
-          date: selectedDate?.toISOString(),
-          time: selectedTime,
-        },
-      });
-    }, 2000);
-  };
+  //   // Optional: simulate a delay (e.g., 1 second) before navigating
+  //   setTimeout(() => {
+  //     router.push({
+  //       pathname: "/usable/success-screen",
+  //       params: {
+  //         name: fullName,
+  //         provider: name,
+  //         date: selectedDate?.toISOString(),
+  //         time: selectedTime,
+  //       },
+  //     });
+  //   }, 2000);
+  // };
 
   const isSlotUnavailable = (slot: string) => bookedSlots.includes(slot);
 
@@ -92,12 +144,11 @@ const SetAppointment = () => {
       <View style={styles.container}>
         <Text style={styles.sectionLabel}>Appointment For</Text>
         <View style={styles.form}>
-          <Text style={styles.label}>Full Name</Text>
+          <Text style={styles.label}>Pet's Name</Text>
           <TextInput
             style={styles.input}
-            placeholder="Enter your full name"
-            value={fullName}
-            onChangeText={setFullName}
+            placeholder="Enter your pet's name"
+            onChangeText={setPetName}
           />
 
           <Text style={styles.label}>Contact Number</Text>
@@ -179,7 +230,7 @@ const SetAppointment = () => {
               styles.confirmButton,
               isSubmitting && { backgroundColor: "#999" },
             ]}
-            onPress={handleConfirm}
+            onPress={createAppointment}
             disabled={isSubmitting}
           >
             <Text style={styles.confirmText}>Confirm Appointment</Text>

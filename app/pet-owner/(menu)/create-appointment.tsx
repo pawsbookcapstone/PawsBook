@@ -57,17 +57,17 @@ const CreateAppointment = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredProviders = dummyProviders.filter((provider) =>
-    provider.name.toLowerCase().includes(searchQuery.toLowerCase())
+    provider.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
   const handleAppointment = (provider: TProviders) => {
     // Navigate to set-appointment and pass provider data
     router.push({
       pathname: "/usable/set-appointment",
       params: {
-        id: provider.id,
-        name: provider.name,
-        type: provider.type,
-        image: provider.image,
+        providerId: provider.id,
+        providerName: provider.name,
+        providerType: provider.type,
+        providerImage: provider.image,
       },
     });
   };

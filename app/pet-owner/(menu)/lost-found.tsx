@@ -1,3 +1,5 @@
+import { useAppContext } from "@/AppsProvider";
+import { all } from "@/helpers/db";
 import { Colors } from "@/shared/colors/Colors";
 import HeaderWithActions from "@/shared/components/HeaderSet";
 import HeaderLayout from "@/shared/components/MainHeaderLayout";
@@ -18,52 +20,103 @@ import {
   View,
 } from "react-native";
 
-const dummyLostFound = [
-  {
-    id: "1",
-    ownerName: "Liam Walker",
-    ownerAvatar: "https://randomuser.me/api/portraits/men/56.jpg",
-    caption: "🚨 Lost near Central Park! Please contact if seen 🐕",
-    petImages: [
-      "https://i.pinimg.com/564x/24/7f/2d/247f2da68e0f94cb6cfb4d43f8d67e11.jpg",
-      "https://i.pinimg.com/564x/75/8c/ae/758cae1b934e79b32e5796c9f5f7077b.jpg",
-      "https://i.pinimg.com/564x/7b/92/ed/7b92ed4a1776b81e80d38213f6bfa5a2.jpg",
-    ],
-    species: "Dog",
-  },
-  {
-    id: "2",
-    ownerName: "Ella Brown",
-    ownerAvatar: "https://randomuser.me/api/portraits/women/18.jpg",
-    caption: "✅ Found this adorable kitten near Green Avenue 🐱",
-    petImages: [
-        "https://placedog.net/400/300?id=1",
-      "https://placedog.net/400/301?id=2",
-      "https://placedog.net/400/302?id=3",
-      "https://placedog.net/400/303?id=4",
-    ],
-    species: "Cat",
-  },
-  {
-    id: "3",
-    ownerName: "Noah Lee",
-    ownerAvatar: "https://randomuser.me/api/portraits/men/45.jpg",
-    caption: "Lost rabbit near Maple Street. Very friendly! 🐇",
-    petImages: [
-      "https://i.pinimg.com/564x/0e/f1/4b/0ef14b73e2c21eeafef812ca36c7fbe0.jpg",
-      "https://i.pinimg.com/564x/5f/b8/f0/5fb8f061a3acbd244eab2e01f5f263a2.jpg",
-      "https://i.pinimg.com/564x/fc/8f/73/fc8f7368a2e1a0cf7c1c21dbf10d53c9.jpg",
-      "https://i.pinimg.com/564x/30/d7/90/30d7906239400b7b0a9d4d5549a9377f.jpg",
-    ],
-    species: "Rabbit",
-  },
-];
+// const dummyLostFound = [
+//   {
+//     id: "1",
+//     ownerName: "Liam Walker",
+//     ownerAvatar: "https://randomuser.me/api/portraits/men/56.jpg",
+//     caption: "🚨 Lost near Central Park! Please contact if seen 🐕",
+//     petImages: [
+//       "https://i.pinimg.com/564x/24/7f/2d/247f2da68e0f94cb6cfb4d43f8d67e11.jpg",
+//       "https://i.pinimg.com/564x/75/8c/ae/758cae1b934e79b32e5796c9f5f7077b.jpg",
+//       "https://i.pinimg.com/564x/7b/92/ed/7b92ed4a1776b81e80d38213f6bfa5a2.jpg",
+//     ],
+//     species: "Dog",
+//   },
+//   {
+//     id: "2",
+//     ownerName: "Ella Brown",
+//     ownerAvatar: "https://randomuser.me/api/portraits/women/18.jpg",
+//     caption: "✅ Found this adorable kitten near Green Avenue 🐱",
+//     petImages: [
+//       "https://placedog.net/400/300?id=1",
+//       "https://placedog.net/400/301?id=2",
+//       "https://placedog.net/400/302?id=3",
+//       "https://placedog.net/400/303?id=4",
+//     ],
+//     species: "Cat",
+//   },
+//   {
+//     id: "3",
+//     ownerName: "Noah Lee",
+//     ownerAvatar: "https://randomuser.me/api/portraits/men/45.jpg",
+//     caption: "Lost rabbit near Maple Street. Very friendly! 🐇",
+//     petImages: [
+//       "https://i.pinimg.com/564x/0e/f1/4b/0ef14b73e2c21eeafef812ca36c7fbe0.jpg",
+//       "https://i.pinimg.com/564x/5f/b8/f0/5fb8f061a3acbd244eab2e01f5f263a2.jpg",
+//       "https://i.pinimg.com/564x/fc/8f/73/fc8f7368a2e1a0cf7c1c21dbf10d53c9.jpg",
+//       "https://i.pinimg.com/564x/30/d7/90/30d7906239400b7b0a9d4d5549a9377f.jpg",
+//     ],
+//     species: "Rabbit",
+//   },
+// ];
 
 const LostFound = () => {
   const [search, setSearch] = useState("");
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [selectedPostImages, setSelectedPostImages] = useState<string[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
+
+  //bagong code
+  const [lostAndFoundItems, setLostAndFoundItems] = useState<any[]>([]);
+  const { userId, userName, userImagePath } = useAppContext();
+  React.useEffect(() => {
+    const fetchLostAndFound = async () => {
+      try {
+        // setIsLoading(true);
+        const snapshot = await all("lost-and-found");
+        const data = snapshot.docs.map((doc) => {
+          const d = doc.data() as any;
+
+          let images: string[] = [];
+          if (Array.isArray(d.petImages) && d.petImages.length > 0) {
+            images = d.petImages;
+          } else if (
+            typeof d.petImages === "string" &&
+            d.petImages.trim() !== ""
+          ) {
+            images = [d.petImages];
+          } else if (d.petImages && typeof d.petImages === "object") {
+            images = Object.values(d.petImages).filter(
+              (url) => typeof url === "string",
+            );
+          }
+          if (images.length === 0 && d.userImage) {
+            images = [d.ownerImg];
+          }
+
+          return {
+            id: doc.id,
+            type: d.type,
+            caption: d.caption,
+            petImages: images,
+            userId: d.userId,
+            ownerName: d.userName,
+            ownerAvatar: d.userImage,
+            species: "undefined",
+          };
+        });
+        setLostAndFoundItems(data);
+        console.log(data);
+      } catch (error) {
+        console.error("Failed to fetch appointments:", error);
+      } finally {
+        // setIsLoading(false);
+      }
+    };
+
+    fetchLostAndFound();
+  }, []);
 
   const handleChat = (name: string) => {
     router.push({
@@ -72,11 +125,12 @@ const LostFound = () => {
     });
   };
 
-  const filteredPosts = dummyLostFound.filter((p) =>
-    p.caption.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredPosts = lostAndFoundItems.filter((p) => {
+    const textToSearch = `${p.caption ?? ""} ${p.type ?? ""}`.toLowerCase();
+    return textToSearch.includes(search.toLowerCase());
+  });
 
-  const renderPost = ({ item }: { item: (typeof dummyLostFound)[0] }) => {
+  const renderPost = ({ item }: { item: (typeof lostAndFoundItems)[0] }) => {
     const postImages = item.petImages;
     const maxImagesToShow = 3;
     const extraImages = postImages.length - maxImagesToShow;
@@ -88,6 +142,7 @@ const LostFound = () => {
           <View style={{ flex: 1 }}>
             <Text style={styles.ownerName}>{item.ownerName}</Text>
             <Text style={styles.subtext}>Posted • {item.species}</Text>
+            <Text style={styles.subtext}>Status: {item.type}</Text>
           </View>
           <Feather name="more-horizontal" size={20} color="#6B7280" />
         </View>
@@ -97,29 +152,31 @@ const LostFound = () => {
         {/* 🧩 Image Grid */}
         {postImages?.length > 0 && (
           <View style={styles.imageGrid}>
-            {postImages.slice(0, maxImagesToShow).map((img, idx) => (
-              <TouchableOpacity
-                key={idx}
-                style={styles.imageWrapper}
-                onPress={() => {
-                  setSelectedPostImages(postImages);
-                  setSelectedIndex(idx);
-                  setImageModalVisible(true);
-                }}
-                activeOpacity={0.8}
-              >
-                <Image
-                  source={{ uri: img }}
-                  style={styles.gridImage}
-                  resizeMode="cover"
-                />
-                {idx === maxImagesToShow - 1 && extraImages > 0 && (
-                  <View style={styles.overlay}>
-                    <Text style={styles.overlayText}>+{extraImages}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
+            {postImages
+              .slice(0, maxImagesToShow)
+              .map((img: string, idx: number) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={styles.imageWrapper}
+                  onPress={() => {
+                    setSelectedPostImages(postImages);
+                    setSelectedIndex(idx);
+                    setImageModalVisible(true);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Image
+                    source={{ uri: img }}
+                    style={styles.gridImage}
+                    resizeMode="cover"
+                  />
+                  {idx === maxImagesToShow - 1 && extraImages > 0 && (
+                    <View style={styles.overlay}>
+                      <Text style={styles.overlayText}>+{extraImages}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
           </View>
         )}
 
@@ -171,7 +228,11 @@ const LostFound = () => {
       {/* ➕ Floating Button */}
       <Pressable
         style={styles.createButton}
-        onPress={() => router.push("/usable/post-lost")}
+        onPress={() =>
+          router.push({
+            pathname: "/usable/post-lost",
+          })
+        }
       >
         <Feather name="plus" size={24} color="#fff" />
       </Pressable>
