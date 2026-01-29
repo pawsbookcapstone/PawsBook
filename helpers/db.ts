@@ -30,7 +30,7 @@ const get1 = async (
   ...whereCond: QueryConstraint[]
 ) => {
   return await getDocs(
-    query(collection(db, path, ...pathSegments), ...whereCond)
+    query(collection(db, path, ...pathSegments), ...whereCond),
   );
 };
 
@@ -94,7 +94,7 @@ const count = (path: string, ...pathSegments: string[]) => {
   return {
     where: async (...whereCond: QueryConstraint[]) => {
       const snap = await getCountFromServer(
-        query(collection(db, path), ...whereCond)
+        query(collection(db, path), ...whereCond),
       );
 
       return snap.data().count;
@@ -109,18 +109,26 @@ const count = (path: string, ...pathSegments: string[]) => {
 
 //   return snap.data().count;
 // };
+const getUserSavedItems = (userId: string) => {
+  if (!userId) throw new Error("User ID is required");
+
+  return {
+    where: async (...whereCond: QueryConstraint[]) =>
+      await get("users", userId, "savedItems").where(...whereCond),
+  };
+};
 
 export {
   add,
   all,
   count,
   find,
-  get,
-  orderBy,
+  get, getUserSavedItems, orderBy,
   remove,
   serverTimestamp,
   set,
   setUnMerged,
   update,
-  where,
+  where
 };
+

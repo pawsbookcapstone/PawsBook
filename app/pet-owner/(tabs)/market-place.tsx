@@ -93,11 +93,15 @@ const marketPlace = () => {
           image: images,
           ownerName: data.ownerName || "Unknown",
           ownerImg: data.ownerImg || null,
+          ownerId: data.ownerId,
         };
       });
 
       setMarketItems(items);
-      console.log("Fetched marketplace items:", items);
+      // console.log(
+      //   "Fetched marketplace item ownerIds:",
+      //   items.map((item) => item.ownerId),
+      // );
     } catch (error) {
       console.log("Error fetching marketplace items:", error);
     } finally {
@@ -156,6 +160,7 @@ const marketPlace = () => {
               location: "Manila, Philippines",
               seller: item.ownerName,
               sellerImage: item.ownerImg,
+              otherUserId: item.ownerId,
             },
           })
         }

@@ -11,6 +11,7 @@ import {
   set,
   where,
 } from "@/helpers/db";
+import { notifyLikePost } from "@/helpers/notify";
 import { computeTimePassed } from "@/helpers/timeConverter";
 import { Colors } from "@/shared/colors/Colors";
 import HeaderLayout from "@/shared/components/MainHeaderLayout";
@@ -26,6 +27,7 @@ import {
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
+  Alert,
   Dimensions,
   findNodeHandle,
   FlatList,
@@ -47,180 +49,180 @@ const myProfileImage = {
 };
 //
 
-const initialPosts: TPost[] = [
-  {
-    id: "1",
-    user: "Jane Doe",
-    profileImage: "https://i.pravatar.cc/100?img=10",
-    cover_photo: "https://picsum.photos/300/200",
-    bio: "Dog Lover",
-    time: "2h ago",
-    content: "Lovely walk with my dog today!",
-    images: [
-      "https://picsum.photos/300/200",
-      "https://picsum.photos/301/200",
-      "https://picsum.photos/302/200",
-    ],
-    liked: false,
-    likesCount: 2,
-    sharesCount: 5,
-    comments: [
-      {
-        id: "c1",
-        user: "John Smith",
-        profileImage: "https://i.pravatar.cc/100?img=2",
-        text: "So cute!",
-      },
-    ],
-    showComments: false,
-    taggedPets: [
-      { id: "p1", name: "Buddy", image: "https://i.pravatar.cc/100?img=12" },
-      { id: "p2", name: "Luna", image: "https://i.pravatar.cc/100?img=13" },
-    ],
-    isFriend: true,
-  },
-  {
-    id: "2",
-    user: "John Smith",
-    profileImage: "https://i.pravatar.cc/100?img=5",
-    cover_photo: "https://picsum.photos/302/200",
-    bio: "Cat Lover",
-    time: "4h ago",
-    content: "Just finished grooming Max! 🐶✨",
-    images: ["https://picsum.photos/303/200"],
-    liked: true,
-    likesCount: 12,
-    sharesCount: 5, // ✅ Added
-    comments: [
-      {
-        id: "c2",
-        user: "Jane Doe",
-        profileImage: "https://i.pravatar.cc/100?img=10",
-        text: "He looks so clean!",
-      },
-      {
-        id: "c3",
-        user: "Alex Lee",
-        profileImage: "https://i.pravatar.cc/100?img=7",
-        text: "A happy dog indeed!",
-      },
-    ],
-    showComments: false,
-    taggedPets: [
-      { id: "p3", name: "Max", image: "https://i.pravatar.cc/100?img=15" },
-    ],
-    isFriend: false,
-  },
-  {
-    id: "3",
-    user: "Emily Johnson",
-    profileImage: "https://i.pravatar.cc/100?img=8",
-    cover_photo: "https://picsum.photos/303/200",
-    bio: "Cat Lover",
-    time: "1d ago",
-    content: "Adopted a new kitten today 😻 Meet Mochi!",
-    images: ["https://picsum.photos/304/200", "https://picsum.photos/305/200"],
-    liked: false,
-    likesCount: 25,
-    sharesCount: 5, // ✅ Added
-    comments: [
-      {
-        id: "c4",
-        user: "Sarah Kim",
-        profileImage: "https://i.pravatar.cc/100?img=4",
-        text: "Omg, so cute!!",
-      },
-    ],
-    showComments: false,
-    taggedPets: [
-      { id: "p4", name: "Mochi", image: "https://i.pravatar.cc/100?img=19" },
-    ],
-    isFriend: true,
-  },
-  {
-    id: "4",
-    user: "Michael Chen",
-    profileImage: "https://i.pravatar.cc/100?img=6",
-    cover_photo: "https://picsum.photos/304/200",
-    bio: "Dog Lover",
-    time: "3d ago",
-    content: "Took Bella to the vet today — she's doing great!",
-    images: ["https://picsum.photos/306/200"],
-    liked: false,
-    likesCount: 8,
-    sharesCount: 5, // ✅ Added
-    comments: [],
-    showComments: false,
-    taggedPets: [
-      { id: "p5", name: "Bella", image: "https://i.pravatar.cc/100?img=16" },
-    ],
-    isFriend: false,
-  },
-  {
-    id: "5",
-    user: "Sarah Kim",
-    profileImage: "https://i.pravatar.cc/100?img=4",
-    cover_photo: "https://picsum.photos/306/200",
-    bio: "Dog Lover",
-    time: "5d ago",
-    content: "Throwback to our weekend hike 🏞️🐕",
-    images: [
-      "https://picsum.photos/307/200",
-      "https://picsum.photos/308/200",
-      "https://picsum.photos/309/200",
-      "https://picsum.photos/310/200",
-    ],
-    liked: true,
-    likesCount: 40,
-    sharesCount: 5, // ✅ Added
-    comments: [
-      {
-        id: "c5",
-        user: "Michael Chen",
-        profileImage: "https://i.pravatar.cc/100?img=6",
-        text: "Looks amazing!",
-      },
-      {
-        id: "c6",
-        user: "Jane Doe",
-        profileImage: "https://i.pravatar.cc/100?img=10",
-        text: "Beautiful views!",
-      },
-    ],
-    showComments: false,
-    taggedPets: [
-      { id: "p6", name: "Rocky", image: "https://i.pravatar.cc/100?img=17" },
-      { id: "p7", name: "Coco", image: "https://i.pravatar.cc/100?img=18" },
-    ],
-    isFriend: true,
-  },
-  {
-    id: "6",
-    user: "Happy Paws Veterinary Clinic",
-    profileImage: "https://i.pravatar.cc/100?img=40",
-    cover_photo: "https://picsum.photos/312/200",
-    bio: "Professional care for your pets 🐾",
-    time: "1d ago",
-    content: "Did you know? Regular checkups can extend your pet’s lifespan!",
-    images: [
-      "https://picsum.photos/400/300?random=1",
-      "https://picsum.photos/400/300?random=2",
-      "https://picsum.photos/400/300?random=3",
-      "https://picsum.photos/400/300?random=4",
-      "https://picsum.photos/400/300?random=5",
-      "https://picsum.photos/400/300?random=6",
-      "https://picsum.photos/400/300?random=7",
-    ],
-    liked: false,
-    likesCount: 10,
-    sharesCount: 2,
-    comments: [],
-    showComments: false,
-    isFriend: false,
-    isPage: true,
-    isFollowing: true,
-  },
-];
+// const initialPosts: TPost[] = [
+//   {
+//     id: "1",
+//     user: "Jane Doe",
+//     profileImage: "https://i.pravatar.cc/100?img=10",
+//     cover_photo: "https://picsum.photos/300/200",
+//     bio: "Dog Lover",
+//     time: "2h ago",
+//     content: "Lovely walk with my dog today!",
+//     images: [
+//       "https://picsum.photos/300/200",
+//       "https://picsum.photos/301/200",
+//       "https://picsum.photos/302/200",
+//     ],
+//     liked: false,
+//     likesCount: 2,
+//     sharesCount: 5,
+//     comments: [
+//       {
+//         id: "c1",
+//         user: "John Smith",
+//         profileImage: "https://i.pravatar.cc/100?img=2",
+//         text: "So cute!",
+//       },
+//     ],
+//     showComments: false,
+//     taggedPets: [
+//       { id: "p1", name: "Buddy", image: "https://i.pravatar.cc/100?img=12" },
+//       { id: "p2", name: "Luna", image: "https://i.pravatar.cc/100?img=13" },
+//     ],
+//     isFriend: true,
+//   },
+//   {
+//     id: "2",
+//     user: "John Smith",
+//     profileImage: "https://i.pravatar.cc/100?img=5",
+//     cover_photo: "https://picsum.photos/302/200",
+//     bio: "Cat Lover",
+//     time: "4h ago",
+//     content: "Just finished grooming Max! 🐶✨",
+//     images: ["https://picsum.photos/303/200"],
+//     liked: true,
+//     likesCount: 12,
+//     sharesCount: 5, // ✅ Added
+//     comments: [
+//       {
+//         id: "c2",
+//         user: "Jane Doe",
+//         profileImage: "https://i.pravatar.cc/100?img=10",
+//         text: "He looks so clean!",
+//       },
+//       {
+//         id: "c3",
+//         user: "Alex Lee",
+//         profileImage: "https://i.pravatar.cc/100?img=7",
+//         text: "A happy dog indeed!",
+//       },
+//     ],
+//     showComments: false,
+//     taggedPets: [
+//       { id: "p3", name: "Max", image: "https://i.pravatar.cc/100?img=15" },
+//     ],
+//     isFriend: false,
+//   },
+//   {
+//     id: "3",
+//     user: "Emily Johnson",
+//     profileImage: "https://i.pravatar.cc/100?img=8",
+//     cover_photo: "https://picsum.photos/303/200",
+//     bio: "Cat Lover",
+//     time: "1d ago",
+//     content: "Adopted a new kitten today 😻 Meet Mochi!",
+//     images: ["https://picsum.photos/304/200", "https://picsum.photos/305/200"],
+//     liked: false,
+//     likesCount: 25,
+//     sharesCount: 5, // ✅ Added
+//     comments: [
+//       {
+//         id: "c4",
+//         user: "Sarah Kim",
+//         profileImage: "https://i.pravatar.cc/100?img=4",
+//         text: "Omg, so cute!!",
+//       },
+//     ],
+//     showComments: false,
+//     taggedPets: [
+//       { id: "p4", name: "Mochi", image: "https://i.pravatar.cc/100?img=19" },
+//     ],
+//     isFriend: true,
+//   },
+//   {
+//     id: "4",
+//     user: "Michael Chen",
+//     profileImage: "https://i.pravatar.cc/100?img=6",
+//     cover_photo: "https://picsum.photos/304/200",
+//     bio: "Dog Lover",
+//     time: "3d ago",
+//     content: "Took Bella to the vet today — she's doing great!",
+//     images: ["https://picsum.photos/306/200"],
+//     liked: false,
+//     likesCount: 8,
+//     sharesCount: 5, // ✅ Added
+//     comments: [],
+//     showComments: false,
+//     taggedPets: [
+//       { id: "p5", name: "Bella", image: "https://i.pravatar.cc/100?img=16" },
+//     ],
+//     isFriend: false,
+//   },
+//   {
+//     id: "5",
+//     user: "Sarah Kim",
+//     profileImage: "https://i.pravatar.cc/100?img=4",
+//     cover_photo: "https://picsum.photos/306/200",
+//     bio: "Dog Lover",
+//     time: "5d ago",
+//     content: "Throwback to our weekend hike 🏞️🐕",
+//     images: [
+//       "https://picsum.photos/307/200",
+//       "https://picsum.photos/308/200",
+//       "https://picsum.photos/309/200",
+//       "https://picsum.photos/310/200",
+//     ],
+//     liked: true,
+//     likesCount: 40,
+//     sharesCount: 5, // ✅ Added
+//     comments: [
+//       {
+//         id: "c5",
+//         user: "Michael Chen",
+//         profileImage: "https://i.pravatar.cc/100?img=6",
+//         text: "Looks amazing!",
+//       },
+//       {
+//         id: "c6",
+//         user: "Jane Doe",
+//         profileImage: "https://i.pravatar.cc/100?img=10",
+//         text: "Beautiful views!",
+//       },
+//     ],
+//     showComments: false,
+//     taggedPets: [
+//       { id: "p6", name: "Rocky", image: "https://i.pravatar.cc/100?img=17" },
+//       { id: "p7", name: "Coco", image: "https://i.pravatar.cc/100?img=18" },
+//     ],
+//     isFriend: true,
+//   },
+//   {
+//     id: "6",
+//     user: "Happy Paws Veterinary Clinic",
+//     profileImage: "https://i.pravatar.cc/100?img=40",
+//     cover_photo: "https://picsum.photos/312/200",
+//     bio: "Professional care for your pets 🐾",
+//     time: "1d ago",
+//     content: "Did you know? Regular checkups can extend your pet’s lifespan!",
+//     images: [
+//       "https://picsum.photos/400/300?random=1",
+//       "https://picsum.photos/400/300?random=2",
+//       "https://picsum.photos/400/300?random=3",
+//       "https://picsum.photos/400/300?random=4",
+//       "https://picsum.photos/400/300?random=5",
+//       "https://picsum.photos/400/300?random=6",
+//       "https://picsum.photos/400/300?random=7",
+//     ],
+//     liked: false,
+//     likesCount: 10,
+//     sharesCount: 2,
+//     comments: [],
+//     showComments: false,
+//     isFriend: false,
+//     isPage: true,
+//     isFollowing: true,
+//   },
+// ];
 
 const Home = () => {
   const { userId, userName, userImagePath } = useAppContext();
@@ -241,11 +243,11 @@ const Home = () => {
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [reportModalVisible, setReportModalVisible] = React.useState(false);
   const [selectedPostId, setSelectedPostId] = React.useState<string | null>(
-    null
+    null,
   );
 
   const [commentInputs, setCommentInputs] = useState<{ [key: string]: string }>(
-    {}
+    {},
   );
 
   const onRefresh = async () => {
@@ -253,7 +255,7 @@ const Home = () => {
     try {
       const friendsSnap = await get("friends").where(
         where("users", "array-contains", userId),
-        where("confirmed", "==", true)
+        where("confirmed", "==", true),
       );
       const friend_ids = friendsSnap.docs.map((d) => {
         const t = d.data();
@@ -263,7 +265,7 @@ const Home = () => {
 
       const snap = await get("posts").where(
         where("creator_id", "in", friend_ids),
-        orderBy("date", "desc")
+        orderBy("date", "desc"),
       );
       const _posts: any = [];
 
@@ -309,6 +311,7 @@ const Home = () => {
   }, []);
 
   useEffect(() => {
+    // console.log(userId, userName, userImagePath);
     if (newPost) {
       try {
         const parsed: TPost = JSON.parse(newPost as string);
@@ -320,30 +323,42 @@ const Home = () => {
   }, [newPost]);
 
   const toggleLike = async (id: string) => {
-    console.log(id);
-
-    // const _posts = Promise.all(
-
-    // );
-    setPosts((_posts: any) =>
-      _posts.map((p: any) => {
+    setPosts((posts: any[]) =>
+      posts.map((p: any) => {
         if (p.id !== id) return p;
 
+        const isLiking = !p.liked;
+
         let liked_by_ids = [];
-        if (!p.liked_by_ids) liked_by_ids = [userId];
-        else {
-          if (p.liked) {
-            liked_by_ids = p.liked_by_ids.filter((l: any) => l !== userId);
-          } else liked_by_ids = [...p.liked_by_ids, userId];
+
+        if (!p.liked_by_ids) {
+          liked_by_ids = [userId];
+        } else {
+          liked_by_ids = p.liked
+            ? p.liked_by_ids.filter((l: string) => l !== userId)
+            : [...p.liked_by_ids, userId];
         }
 
-        set("posts", id).value({ liked_by_ids: liked_by_ids });
+        // 🔥 Update Firestore
+        set("posts", id).value({ liked_by_ids });
+
+        // 🔔 SEND NOTIFICATION (only if liking)
+        if (isLiking && p.userId !== userId) {
+          notifyLikePost({
+            toUserId: id, // post owner
+            fromUserId: userId,
+            name: userName,
+            profile: userImagePath,
+            postId: id,
+          });
+        }
+
         return {
           ...p,
-          liked_by_ids: [...liked_by_ids],
-          liked: !p.liked,
+          liked_by_ids,
+          liked: isLiking,
         };
-      })
+      }),
     );
   };
 
@@ -351,8 +366,8 @@ const Home = () => {
     setComment("");
     setPosts((prev: any) =>
       prev.map((p: any) =>
-        p.id === id ? { ...p, showComments: !p.showComments } : p
-      )
+        p.id === id ? { ...p, showComments: !p.showComments } : p,
+      ),
     );
   };
 
@@ -377,8 +392,8 @@ const Home = () => {
               ...p,
               comments: [...p.comments, data],
             }
-          : p
-      )
+          : p,
+      ),
     );
     setComment("");
 
@@ -411,7 +426,7 @@ const Home = () => {
   };
   const handleFollow = (postId: string) => {
     setPosts((prev: any) =>
-      prev.map((p: any) => (p.id === postId ? { ...p, isFollowing: true } : p))
+      prev.map((p: any) => (p.id === postId ? { ...p, isFollowing: true } : p)),
     );
     ToastAndroid.show("You are now following this page!", ToastAndroid.SHORT);
   };
@@ -442,6 +457,21 @@ const Home = () => {
   //   setSelectedPostId(postId);
   //   setReportModalVisible(true);
   // };
+  const deletePost = async (postId: string) => {
+    try {
+      // Delete from Firestore
+      await remove("posts", postId); // or deleteDoc(doc(db, "posts", postId));
+
+      // Update local state
+      setPosts((prev: any) => prev.filter((p: any) => p.id !== postId));
+
+      // Feedback
+      ToastAndroid.show("Post deleted", ToastAndroid.SHORT);
+    } catch (e) {
+      console.log("Failed to delete post:", e);
+      Alert.alert("Error", "Failed to delete post");
+    }
+  };
 
   const renderPost = ({ item }: any) => {
     const maxImagesToShow = 3;
@@ -823,6 +853,8 @@ const Home = () => {
               postId={selectedPostId}
               x={dropdownPos.x}
               y={dropdownPos.y}
+              onClose={() => setShowDropdown(false)}
+              isMyPost={isMyPost}
               onSave={(_unSavedId) => {
                 if (isMyPost) {
                   console.log("Edit post", selectedPostId);
@@ -835,19 +867,16 @@ const Home = () => {
                 }
                 setShowDropdown(false);
               }}
-              onReport={(id) => {
+              onReport={(id: string) => {
                 if (isMyPost) {
-                  // Delete post
-                  setPosts((prev: any) => prev.filter((p: any) => p.id !== id));
-                  ToastAndroid.show("Post deleted", ToastAndroid.SHORT);
+                  deletePost(id);
                 } else {
                   setSelectedPostId(id);
                   setTimeout(() => setReportModalVisible(true), 50);
                 }
+
                 setShowDropdown(false);
               }}
-              onClose={() => setShowDropdown(false)}
-              isMyPost={isMyPost} // 👈 pass flag down to PostDropdown
             />
           );
         })()}
@@ -862,7 +891,7 @@ const Home = () => {
           // Remove the reported post from the feed
           if (selectedPostId) {
             setPosts((prev: any) =>
-              prev.filter((p: any) => p.id !== selectedPostId)
+              prev.filter((p: any) => p.id !== selectedPostId),
             );
           }
 

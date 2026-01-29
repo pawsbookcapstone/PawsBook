@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "PawsBook",
-    "slug": "PawsBook",
+    "slug": "pawsbook",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/Icons/icon.png",
@@ -56,7 +56,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "b058caa9-c4d8-467e-bcf0-329c3d184985"
+        "projectId": "f339b60e-469b-4b78-8187-70b5970c7b8e"
       }
     }
   }

@@ -1,5 +1,7 @@
 import { useAppContext } from "@/AppsProvider";
-import { find } from "@/helpers/db";
+import { LoadingButton } from "@/components/LoadingButton";
+
+import { find, set } from "@/helpers/db";
 import { auth } from "@/helpers/firebase";
 import { Colors } from "@/shared/colors/Colors";
 import { screens } from "@/shared/styles/styles";
@@ -19,11 +21,12 @@ import {
 } from "react-native";
 
 const Login = () => {
-  // const [email, setemail] = useState("admin@admin.com");
-  // const [password, setpassword] = useState("password");
-  //ad's account
-  const [email, setemail] = useState("adrianfegalan@gmail.com");
+  const [email, setemail] = useState("email@gmail.com");
   const [password, setpassword] = useState("PASSWORD");
+  //ad's account
+  // const [email, setemail] = useState("adrianfegalan@gmail.com");
+  // const [password, setpassword] = useState("PASSWORD");
+  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const {
@@ -39,6 +42,7 @@ const Login = () => {
   };
 
   const onLogin = async () => {
+    setLoading(true);
     if (!email || !password) {
       Alert.alert("Error", "Please fill in all fields");
       return;
@@ -59,17 +63,30 @@ const Login = () => {
         return;
       }
 
+      //add this after this or in line 61- from edmar
+
+      if (!userDoc.exists()) {
+        await auth.signOut();
+        Alert.alert("Error", "Account not found!!!");
+        return;
+      }
+      set("users", userCredential.user.uid).value({ online: true });
+      //until here
       const user = userDoc.data();
       setUserId(userCredential.user.uid);
       setUserFirstName(user.firstname);
       setUserLastName(user.lastname);
       setUserEmail(user.email);
       setUserImagePath(user.img_path);
-
-      router.replace("/pet-owner/(tabs)/home");
+      setLoading(false);
+      router.replace({
+        pathname: "/pet-owner/(tabs)/home",
+        params: { imagepath: setUserImagePath },
+      });
     } catch (e) {
       Alert.alert("Error", e + "");
       console.log(e);
+      setLoading(false);
     }
   };
 
@@ -147,9 +164,17 @@ const Login = () => {
       <Text style={styles.forgotPassword}>Forgot password?</Text>
 
       {/* <Link href="/pet-owner/(tabs)/home" asChild> */}
-      <Pressable onPress={onLogin} style={styles.buttonContainer}>
+      {/* <Pressable onPress={onLogin} style={styles.buttonContainer}>
         <Text style={styles.buttonText}>Login</Text>
-      </Pressable>
+      </Pressable> */}
+      <LoadingButton
+        title="Login"
+        loading={loading}
+        onPress={onLogin}
+        style={styles.buttonContainer}
+        textStyle={styles.buttonText}
+      />
+
       {/* </Link> */}
 
       {/* <Link href="/auth/register" asChild> */}

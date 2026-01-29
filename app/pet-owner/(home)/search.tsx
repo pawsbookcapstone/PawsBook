@@ -1,10 +1,20 @@
 import { useAppContext } from "@/AppsProvider";
-import { add, all, get, remove, serverTimestamp, where } from "@/helpers/db";
+import {
+  add,
+  all,
+  get,
+  orderBy,
+  remove,
+  serverTimestamp,
+  set,
+  where,
+} from "@/helpers/db";
 import HeaderWithActions from "@/shared/components/HeaderSet";
 import HeaderLayout from "@/shared/components/MainHeaderLayout";
 import { screens, ShadowStyle } from "@/shared/styles/styles";
 import { Entypo } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { limit } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -22,27 +32,23 @@ import {
 
 type FriendStatus = "Friend" | "Pending Friend Request" | "Not Friend";
 
-const initialSearches = [
-  {
-    id: "1",
-    name: "John Doe",
-    img_path: "https://randomuser.me/api/portraits/men/32.jpg",
-  },
-  {
-    id: "2",
-    name: "Jane Smith",
-    img_path: "https://randomuser.me/api/portraits/women/44.jpg",
-  },
-  {
-    id: "3",
-    name: "Alex Carter",
-    img_path: "https://randomuser.me/api/portraits/men/12.jpg",
-  },
-];
+// const initialSearches = [
+// {
+//   id: string;
+//   name: string;
+//   img_path: string | null;
+// }
+// ];
+type RecentSearch = {
+  id: string;
+  name: string;
+  img_path: string | null;
+};
+const initialSearches: RecentSearch[] = [];
 
 const Search = () => {
   const { userId, userName, userImagePath } = useAppContext();
-
+  const [resultText, setResultText] = useState("");
   const [search, setSearch] = useState("");
   const [searched, setSearched] = useState<any>([]);
   const [users, setUsers] = useState<any>([]);
@@ -58,7 +64,7 @@ const Search = () => {
     const fetchUsers = async () => {
       const snap = await all("users");
       const friendsSnap = await get("friends").where(
-        where("users", "array-contains", userId)
+        where("users", "array-contains", userId),
       );
       let friendsData: { [key: string]: { id: string; status: FriendStatus } } =
         {};
@@ -83,7 +89,7 @@ const Search = () => {
             status: _friend?.status ?? "Not Friend",
             friend_id: _friend?.id,
           };
-        })
+        }),
       );
     };
     fetchUsers();
@@ -96,7 +102,7 @@ const Search = () => {
 
   const openDropdown = (
     event: any,
-    id: string // item id
+    id: string, // item id
   ) => {
     const handle = findNodeHandle(event.target);
     if (handle) {
@@ -108,14 +114,70 @@ const Search = () => {
     }
   };
 
-  const renderItem = ({ item }: { item: (typeof initialSearches)[0] }) => (
-    <View style={styles.item}>
-      <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-        <Image source={{ uri: item.img_path }} style={styles.avatar} />
-        <Text style={styles.name}>{item.name}</Text>
-      </View>
+  //fetch searches
+  useEffect(() => {
+    if (!userId) return;
 
-      {/* Three-dot action */}
+    const fetchRecentSearches = async () => {
+      try {
+        const snap = await get("users", userId, "recent_searches").where(
+          orderBy("date", "desc"),
+          limit(10),
+        );
+
+        setRecentSearches(
+          snap.docs.map((doc) => {
+            const d = doc.data();
+            return {
+              id: doc.id,
+              name: d.name,
+              img_path: d.img_path ?? "",
+            };
+          }),
+        );
+        console.log(recentSearches);
+      } catch (e) {
+        console.log("Failed to fetch recent searches:", e);
+      }
+    };
+
+    fetchRecentSearches();
+  }, [userId]);
+
+  // const handleSeeProfile = (item: any) => {
+  //   router.push({
+  //     pathname: "/usable/user-profile",
+  //     params: { userToViewId: item },
+  //   });
+  // };
+
+  const renderItem = ({ item }: any) => (
+    <View style={styles.item}>
+      {/* Left side: pressable to view profile */}
+      <TouchableOpacity
+        style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
+        activeOpacity={0.7}
+        onPress={() =>
+          router.push({
+            pathname: "/usable/user-profile",
+            params: { userToViewId: item.id },
+          })
+        }
+      >
+        <Image
+          source={
+            item.img_path
+              ? { uri: item.img_path }
+              : {
+                  uri: "https://res.cloudinary.com/diwwrxy8b/image/upload/v1769641991/jzibxr8wuvqhfqwcnusm.jpg",
+                }
+          }
+          style={styles.avatar}
+        />
+        <Text style={styles.name}>{item.name}</Text>
+      </TouchableOpacity>
+
+      {/* Right side: three-dot menu */}
       <TouchableOpacity onPress={(e) => openDropdown(e.nativeEvent, item.id)}>
         <Entypo name="dots-three-vertical" size={18} color="#555" />
       </TouchableOpacity>
@@ -124,10 +186,21 @@ const Search = () => {
 
   const renderSearchedItem = ({ item }: any) => (
     <View style={styles.item}>
-      <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-        <Image source={{ uri: item.img_path }} style={styles.avatar} />
-        <Text style={styles.name}>{item.name}</Text>
-      </View>
+      <TouchableOpacity
+        style={{ flex: 1 }}
+        activeOpacity={0.7}
+        onPress={() =>
+          router.push({
+            pathname: "/usable/user-profile",
+            params: { userToViewId: item.id },
+          })
+        }
+      >
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Image source={{ uri: item.img_path }} style={styles.avatar} />
+          <Text style={styles.name}>{item.name}</Text>
+        </View>
+      </TouchableOpacity>
 
       {item.status === "Not Friend" && (
         <TouchableOpacity onPress={() => handleAddFriend(item)}>
@@ -153,59 +226,77 @@ const Search = () => {
         users.filter(
           (user: any) =>
             user.name.toLowerCase().includes(search.toLowerCase()) &&
-            user.id !== userId
-        )
+            user.id !== userId,
+        ),
       );
+      // if (searched.length == 0) {
+      //   setResultText("No search result");
+      // }
     } catch (e) {
       Alert.alert("Error", e + "");
     }
   };
 
-  const handleAddFriend = async (otherUser: any) => {
+  const saveRecentSearch = async (item: any) => {
+    if (!userId) return;
+
     try {
-      add("users", userId, "recent_searches").value({
-        id: otherUser.id,
-        name: otherUser.name,
-        img_path: otherUser.img_path ?? null,
+      await set("users", userId, "recent_searches", item.id).value({
+        name: item.name,
+        img_path: item.img_path ?? null,
         date: serverTimestamp(),
       });
+    } catch (e) {
+      console.log("Failed to save recent search:", e);
+    }
+  };
+
+  const handleAddFriend = async (item: any) => {
+    saveRecentSearch(item);
+
+    // ✅ change text immediately
+    setUsers((prev: any) =>
+      prev.map((u: any) =>
+        u.id === item.id ? { ...u, status: "Pending Friend Request" } : u,
+      ),
+    );
+
+    try {
       await add("friends").value({
-        users: [userId, otherUser.id],
+        users: [userId, item.id],
         date_requested: serverTimestamp(),
         requested_by_id: userId,
         confirmed: false,
         details: {
+          // Save info of the friend you are requesting
+          [item.id]: {
+            name: item.name,
+            img_path: item.img_path ?? "",
+          },
+          // Optionally, save current user info too
           [userId]: {
             name: userName,
-            img_path: userImagePath ?? null,
-          },
-          [otherUser.id]: {
-            name: otherUser.name,
-            img_path: otherUser.img_path ?? null,
+            img_path: userImagePath ?? "",
           },
         },
       });
     } catch (e) {
-      Alert.alert("Error", e + "");
+      Alert.alert("Error", String(e));
     }
   };
 
-  const handleCancelFriendRequest = async (otherUser: any) => {
-    console.log();
-
-    if (!otherUser.friend_id) return;
-    console.log(otherUser.friend_id);
+  const handleCancelFriendRequest = async (item: any) => {
+    saveRecentSearch(item);
+    setUsers((prev: any) =>
+      prev.map((u: any) =>
+        u.id === item.id ? { ...u, status: "Not Friend" } : u,
+      ),
+    );
 
     try {
-      // add("users", userId, "recent_searches").value({
-      //   id: otherUser.id,
-      //   name: otherUser.name,
-      //   img_path: otherUser.img_path ?? null,
-      //   date: serverTimestamp(),
-      // });
-      remove("friends", otherUser.friend_id);
+      await remove("friends", item.friend_id);
     } catch (e) {
-      Alert.alert("Error", e + "");
+      Alert.alert("Error", String(e));
     }
   };
 
@@ -224,26 +315,34 @@ const Search = () => {
         </HeaderWithActions>
       </HeaderLayout>
 
-      {searched.length > 0 ? (
-        <FlatList
-          data={searched}
-          keyExtractor={(item) => item.id}
-          renderItem={renderSearchedItem}
-          contentContainerStyle={{
-            paddingVertical: 10,
-            backgroundColor: "white",
-            marginTop: 12,
-          }}
-          ListHeaderComponent={() => (
-            <Text style={styles.recentTitle}>Search Results</Text>
-          )}
-          ListEmptyComponent={() => (
-            <Text style={{ textAlign: "center", color: "gray", marginTop: 20 }}>
-              No recent searches
-            </Text>
-          )}
-        />
-      ) : null}
+      {
+        searched.length > 0 ? (
+          <FlatList
+            data={searched}
+            keyExtractor={(item) => item.id}
+            renderItem={renderSearchedItem}
+            contentContainerStyle={{
+              paddingVertical: 10,
+              backgroundColor: "white",
+              marginTop: 12,
+            }}
+            ListHeaderComponent={() => (
+              <Text style={styles.recentTitle}>Search Results</Text>
+            )}
+            ListEmptyComponent={() => (
+              <Text
+                style={{ textAlign: "center", color: "gray", marginTop: 20 }}
+              >
+                No recent searches
+              </Text>
+            )}
+          />
+        ) : null
+
+        // <Text style={{ textAlign: "center", color: "gray", marginTop: 20 }}>
+        //   {resultText}
+        // </Text>
+      }
 
       <FlatList
         data={recentSearches}
@@ -259,7 +358,7 @@ const Search = () => {
         )}
         ListEmptyComponent={() => (
           <Text style={{ textAlign: "center", color: "gray", marginTop: 20 }}>
-            No recent searches
+            No Recent Searches
           </Text>
         )}
       />

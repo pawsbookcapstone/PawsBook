@@ -37,19 +37,34 @@ const addFriend = () => {
     try {
       const snap = await all("friends");
 
-      let _friendRequestsData: any = [];
-      let _friends: any = [];
-      let _usersFriends: any = {};
+      let _friendRequestsData: any[] = [];
+      let _friends: any[] = [];
+      let _usersFriends: Record<string, number> = {};
+
       for (const t of snap.docs) {
         const d = t.data();
         const [u1, u2] = d.users;
 
+        // Safely get other user's info
+        const otherUser = d.details?.[u1] ?? {
+          name: d.userName,
+          img_path: d.userImagePath,
+        };
+
+        // Only show requests where the current user is the receiver
         if (!d.confirmed && u2 === userId) {
+          const requestTime = d.date_requested?.toDate
+            ? computeTimePassed(d.date_requested.toDate())
+            : "Just now";
+
           _friendRequestsData.push({
             id: t.id,
             other_user_id: u1,
-            other_user: d.details[u1],
-            time: computeTimePassed(d.date_requested.toDate()),
+            other_user: {
+              name: otherUser.name,
+              img_path: otherUser.img_path ?? "",
+            },
+            time: requestTime,
             mutual_friends: 0,
           });
           continue;
@@ -57,25 +72,33 @@ const addFriend = () => {
 
         if (!d.confirmed) continue;
 
-        if (u1 === userId || u2 === userId)
+        // Track confirmed friends
+        if (u1 === userId || u2 === userId) {
           _usersFriends[u1 === userId ? u2 : u1] = 1;
-        else _friends.push(d.users);
+        } else {
+          _friends.push(d.users);
+        }
       }
 
+      // Calculate mutual friends
       for (const fr of _friendRequestsData) {
-        for (const [u1, u2] of _friends) {
+        for (const usersPair of _friends) {
+          if (!Array.isArray(usersPair)) continue;
+          const [u1, u2] = usersPair;
           if (
             (u1 === fr.other_user_id && _usersFriends[u2]) ||
             (u2 === fr.other_user_id && _usersFriends[u1])
-          )
+          ) {
             fr.mutual_friends++;
+          }
         }
       }
 
       setFriendRequests(_friendRequestsData);
+      console.log(_friendRequestsData);
     } catch (e) {
       Alert.alert("Error", e + "");
-      console.log(e);
+      console.log("Error", e);
     } finally {
       setRefreshing(false);
     }

@@ -1,3 +1,6 @@
+import { useAppContext } from "@/AppsProvider";
+import { uploadImageUri } from "@/helpers/cloudinary";
+import { add, serverTimestamp } from "@/helpers/db";
 import { Colors } from "@/shared/colors/Colors";
 import HeaderWithActions from "@/shared/components/HeaderSet";
 import HeaderLayout from "@/shared/components/MainHeaderLayout";
@@ -7,32 +10,91 @@ import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
+  FlatList,
   Image,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
+
+const categories = ["Dog", "Cat", "Rabbit", "Others"];
 
 const CreateAdoptionPost = () => {
   const [image, setImage] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
 
+  // bagong code
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalOptions, setModalOptions] = useState<string[]>([]);
+  const [modalType, setModalType] = useState("category");
+  const [petCategory, setPetCategory] = useState(
+    "Please select your pet category",
+  );
+
+  const openModal = (type: "category") => {
+    setModalType(type);
+    setModalOptions(categories);
+    setModalVisible(true);
+  };
+
+  const handleSelectPetCategory = (item: string) => {
+    setPetCategory(item);
+    setModalVisible(false);
+  };
+
+  const { userId, userName, userImagePath } = useAppContext();
+  // const [images, setImages] = useState<string[]>([]);
+
+  const createLostFound = async () => {
+    try {
+      const finalImage = await uploadImageUri(image);
+
+      await add("post-adopt").value({
+        petCategory: petCategory,
+        caption: caption,
+        userId: userId,
+        userName: userName,
+        userImage: userImagePath ?? "default",
+        createdAt: serverTimestamp(),
+        petImage: finalImage,
+      });
+      console.log("Post Created:", {
+        image,
+        caption,
+        petCategory,
+        userId,
+        userName,
+        userImagePath,
+      });
+      router.replace("/pet-owner/(menu)/adapt");
+    } catch (error) {
+      console.error("Failed to create appointment:", error);
+      alert("Something went wrong. Please try again.");
+    } finally {
+      // setLoading(false);
+    }
+  };
+
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images, // still valid
+      allowsEditing: true,
       quality: 1,
     });
-    if (!result.canceled) {
+
+    if (!result.canceled && result.assets.length > 0) {
       setImage(result.assets[0].uri);
     }
   };
 
-  const handlePost = () => {
-    console.log("Adoption Post Created:", { image, caption });
-    router.back();
-  };
+  // const handlePost = () => {
+  //   console.log("Adoption Post Created:", { images, caption });
+  //   router.back();
+  // };
 
   return (
     <View style={[screens.screen, { backgroundColor: "#fff", flex: 1 }]}>
@@ -46,6 +108,15 @@ const CreateAdoptionPost = () => {
       </HeaderLayout>
 
       <View style={styles.container}>
+        {/* Pet Catergory */}
+        <Text style={styles.label}>Pet Category</Text>
+        <TouchableOpacity
+          style={styles.selectionBtn}
+          onPress={() => openModal("category")}
+        >
+          <Text style={{ color: "#000" }}>{petCategory}</Text>
+        </TouchableOpacity>
+
         {/* Caption */}
         <Text style={styles.label}>Caption</Text>
         <TextInput
@@ -69,12 +140,40 @@ const CreateAdoptionPost = () => {
         {/* Post Button */}
         <Pressable
           style={[styles.postBtn, { opacity: caption ? 1 : 0.7 }]}
-          onPress={handlePost}
+          onPress={createLostFound}
           disabled={!caption}
         >
           <Text style={styles.postBtnText}>Post</Text>
         </Pressable>
       </View>
+
+      {/* modal */}
+      <Modal transparent visible={modalVisible} animationType="slide">
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setModalVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {modalType === "category"
+                ? "Select Category"
+                : "Select Condition"}
+            </Text>
+            <FlatList
+              data={modalOptions}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.modalOption}
+                  onPress={() => handleSelectPetCategory(item)}
+                >
+                  <Text style={styles.modalOptionText}>{item}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 };
@@ -126,4 +225,34 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 16,
   },
+  selectionBtn: {
+    borderWidth: 1,
+    borderColor: "#eee",
+    borderRadius: 12,
+    height: 48,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    backgroundColor: "#fafafa",
+    marginBottom: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    maxHeight: "50%",
+  },
+  modalTitle: { fontSize: 16, fontWeight: "600", marginBottom: 10 },
+  modalOption: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  modalOptionText: { fontSize: 15 },
 });

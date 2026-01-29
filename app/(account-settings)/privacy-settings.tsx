@@ -1,17 +1,31 @@
+import { useAppContext } from "@/AppsProvider";
+import { find, set } from "@/helpers/db";
 import { Colors } from "@/shared/colors/Colors";
 import HeaderWithActions from "@/shared/components/HeaderSet";
 import HeaderLayout from "@/shared/components/MainHeaderLayout";
 import { screens } from "@/shared/styles/styles";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 
 const PrivacySettings = () => {
+  const { userId } = useAppContext();
+
   const [isOnline, setIsOnline] = useState(true);
 
+  useEffect(() => {
+    const fetch = async () => {
+      const snap = await find("users", userId);
+      setIsOnline(snap.data()?.online_status ?? true);
+    };
+    fetch();
+  }, []);
+
   const toggleStatus = () => {
-    setIsOnline((prev) => !prev);
+    const v = !isOnline;
+    setIsOnline(v);
+    set("users", userId).value({ online_status: v });
   };
 
   return (

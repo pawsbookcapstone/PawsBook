@@ -118,10 +118,14 @@ const LostFound = () => {
     fetchLostAndFound();
   }, []);
 
-  const handleChat = (name: string) => {
+  const handleChat = (name: string, userId: string, othersImage: string) => {
     router.push({
       pathname: "/pet-owner/(chat)/chat-field",
-      params: { user: name },
+      params: {
+        otherUserId: userId,
+        otherUserName: name,
+        otherUserImgPath: othersImage,
+      },
     });
   };
 
@@ -183,7 +187,9 @@ const LostFound = () => {
         <View style={styles.actionBar}>
           <Pressable
             style={styles.actionButton}
-            onPress={() => handleChat(item.ownerName)}
+            onPress={() =>
+              handleChat(item.ownerName, item.userId, item.ownerAvatar)
+            }
           >
             <Feather name="message-circle" size={20} color={Colors.primary} />
             <Text style={[styles.actionLabel, { color: Colors.primary }]}>

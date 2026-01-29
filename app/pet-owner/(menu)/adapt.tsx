@@ -1,9 +1,12 @@
+import { useAppContext } from "@/AppsProvider";
+import { all } from "@/helpers/db";
+import { saveAdoptPet } from "@/helpers/savedItems";
 import { Colors } from "@/shared/colors/Colors";
 import HeaderWithActions from "@/shared/components/HeaderSet";
 import HeaderLayout from "@/shared/components/MainHeaderLayout";
 import { screens } from "@/shared/styles/styles";
 import { Entypo, Feather, Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
   Dimensions,
@@ -47,23 +50,111 @@ const dummyPosts = [
 ];
 
 const Adapt = () => {
-  const [posts, setPosts] = useState(dummyPosts);
+  const [posts, setPosts] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [selectedSpecies, setSelectedSpecies] = useState("All");
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [selectedPostImages, setSelectedPostImages] = useState<string[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const {
+    id,
+    caption,
+    petCategory,
+    petImage,
+    ownerId,
+    ownerName,
+    ownerImage,
+    saveCategory,
+  } = useLocalSearchParams();
 
-  const toggleSave = (id: string) => {
-    setPosts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, saved: !p.saved } : p))
-    );
+  const { userId, userName, userImagePath } = useAppContext();
+
+  //bagong code
+  React.useEffect(() => {
+    const fetchAdoptionPosts = async () => {
+      try {
+        // setIsLoading(true);
+        const snapshot = await all("post-adopt");
+        const data = snapshot.docs.map((doc) => {
+          const d = doc.data() as any;
+
+          let image: string | null = null;
+
+          if (typeof d.petImage === "string" && d.petImage.trim() !== "") {
+            image = d.petImage;
+          } else if (
+            typeof d.ownerImg === "string" &&
+            d.ownerImg.trim() !== ""
+          ) {
+            // fallback image
+            image = d.ownerImg;
+          }
+
+          return {
+            id: doc.id,
+            category: d.petCategory,
+            caption: d.caption,
+            petImage: image,
+            ownerId: d.userId,
+            ownerName: d.userName,
+            ownerImage: d.userImage,
+          };
+        });
+        setPosts(data);
+        console.log(data);
+      } catch (error) {
+        console.error("Failed to fetch appointments:", error);
+      } finally {
+        // setIsLoading(false);
+      }
+    };
+
+    fetchAdoptionPosts();
+  }, []);
+
+  // const toggleSave = (id: string) => {
+  //   setPosts((prev) =>
+  //     prev.map((p) => (p.id === id ? { ...p, saved: !p.saved } : p)),
+  //   );
+  // };
+  // const { userId } = useAppContext();
+  const handleSaveItem = async (item: (typeof posts)[0]) => {
+    if (!userId) {
+      alert("You must be logged in to save items.");
+      return;
+    }
+
+    if (!item.id) {
+      alert("Post ID is missing!");
+      return;
+    }
+
+    await saveAdoptPet(userId, {
+      id: item.id,
+      caption: item.caption,
+      petCategory: item.category,
+      petImage: item.petImage,
+      ownerId: item.ownerId,
+      ownerName: item.ownerName,
+      ownerImage: item.ownerImage,
+      saveCategory: item.saveCategory,
+    });
+
+    alert("Item saved to your collection!");
   };
 
-  const handleChat = (name: string) => {
+  const handleChat = (name: string, ownerId: string, ownerImage: string) => {
+    console.log(name, ownerId, ownerImage);
     router.push({
       pathname: "/pet-owner/(chat)/chat-field",
-      params: { user: name },
+      params: {
+        // userId: userId,
+        // userImagePath: ownerImage,
+        // userName: ownerName,
+        otherUserId: ownerId,
+        otherUserName: name,
+        otherUserImgPath: ownerImage,
+      },
     });
   };
 
@@ -74,24 +165,24 @@ const Adapt = () => {
       p.ownerName.toLowerCase().includes(search.toLowerCase()) ||
       p.caption.toLowerCase().includes(search.toLowerCase());
     const matchesSpecies =
-      selectedSpecies === "All" || p.species === selectedSpecies;
+      selectedSpecies === "All" || p.category === selectedSpecies;
     return matchesSearch && matchesSpecies;
   });
 
   const renderPost = ({ item }: { item: (typeof posts)[0] }) => {
-    const postImages = item.images || [];
-    const maxImagesToShow = 3;
-    const extraImages = postImages.length - maxImagesToShow;
+    const postImage = item.petImage;
+    // const maxImagesToShow = 3;
+    // const extraImages = postImages.length - maxImagesToShow;
 
     return (
       <View style={styles.postCard}>
         {/* Header */}
         <View style={styles.postHeader}>
-          <Image source={{ uri: item.ownerAvatar }} style={styles.avatar} />
+          <Image source={{ uri: item.ownerImage }} style={styles.avatar} />
           <View style={{ flex: 1 }}>
             <Text style={styles.ownerName}>{item.ownerName}</Text>
             <Text style={styles.subtext}>
-              Posted a pet for adoption • {item.species}
+              Posted a pet for adoption • {item.category}
             </Text>
           </View>
           <Entypo name="dots-three-horizontal" size={18} color="#555" />
@@ -103,26 +194,22 @@ const Adapt = () => {
         ) : null}
 
         {/* Image Grid */}
-        {postImages.length > 0 && (
+        {postImage && (
           <View style={styles.imageGrid}>
-            {postImages.slice(0, maxImagesToShow).map((img, idx) => (
-              <Pressable
-                key={idx}
-                style={styles.imageWrapper}
-                onPress={() => {
-                  setSelectedPostImages(postImages);
-                  setSelectedIndex(idx);
-                  setImageModalVisible(true);
-                }}
-              >
-                <Image source={{ uri: img }} style={styles.gridImage} />
-                {idx === maxImagesToShow - 1 && extraImages > 0 && (
-                  <View style={styles.overlay}>
-                    <Text style={styles.overlayText}>+{extraImages}</Text>
-                  </View>
-                )}
-              </Pressable>
-            ))}
+            <Pressable
+              style={styles.imageWrapper}
+              onPress={() => {
+                setSelectedPostImages([postImage]); // for modal compatibility
+                setSelectedIndex(0);
+                setImageModalVisible(true);
+              }}
+            >
+              <Image
+                source={{ uri: postImage }}
+                style={styles.gridImage}
+                resizeMode="cover"
+              />
+            </Pressable>
           </View>
         )}
 
@@ -130,7 +217,7 @@ const Adapt = () => {
         <View style={styles.actionBar}>
           <Pressable
             style={styles.actionButton}
-            onPress={() => toggleSave(item.id)}
+            onPress={() => handleSaveItem(item)}
           >
             <Feather
               name="bookmark"
@@ -151,7 +238,9 @@ const Adapt = () => {
 
           <Pressable
             style={styles.actionButton}
-            onPress={() => handleChat(item.ownerName)}
+            onPress={() =>
+              handleChat(item.ownerName, item.ownerId, item.ownerImage)
+            }
           >
             <Ionicons name="chatbubble-outline" size={20} color="#374151" />
             <Text style={styles.actionLabel}>Chat</Text>
@@ -250,6 +339,51 @@ const Adapt = () => {
           </Pressable>
         </View>
       </Modal>
+
+      {/*  Moda for deletion*/}
+      {/* <Modal
+              visible={modalVisible}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setModalVisible(false)}
+            >
+              <Pressable
+                style={styles.modalOverlay}
+                onPress={() => setModalVisible(false)}
+              >
+                <View style={styles.modalCard}>
+                  <Text style={styles.modalTitle}>
+                    {selectedPet
+                      ? `What do you want to do with ${selectedPet.name}?`
+                      : "Pet Actions"}
+                  </Text>
+      
+                  <TouchableOpacity onPress={handleEdit} style={styles.modalButton}>
+                    <Ionicons
+                      name="create-outline"
+                      size={18}
+                      color={Colors.primary}
+                    />
+                    <Text style={[styles.modalButtonText, { color: Colors.primary }]}>
+                      Edit Pet
+                    </Text>
+                  </TouchableOpacity>
+      
+                  <TouchableOpacity
+                    style={styles.modalButton}
+                    onPress={() => {
+                      setModalVisible(false);
+                      setConfirmVisible(true);
+                    }}
+                  >
+                    <Ionicons name="trash-outline" size={18} color="#E74C3C" />
+                    <Text style={[styles.modalButtonText, { color: "#E74C3C" }]}>
+                      Delete Pet
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </Pressable>
+            </Modal> */}
 
       {/* Floating Create Post Button */}
       <Pressable
@@ -408,10 +542,10 @@ const styles = StyleSheet.create({
   },
   actionBar: {
     flexDirection: "row",
-gap: 10,
-marginLeft : 10,
+    gap: 10,
+    marginLeft: 10,
     alignItems: "center",
-marginTop: 10,
+    marginTop: 10,
     paddingVertical: 8,
   },
   actionButton: {
@@ -426,7 +560,6 @@ marginTop: 10,
   divider: {
     width: 1,
     height: 20,
-  
   },
   createButton: {
     position: "absolute",

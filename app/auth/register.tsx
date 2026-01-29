@@ -63,7 +63,7 @@ const Register = () => {
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
-        password
+        password,
       );
 
       await set("users", userCredential.user.uid).value({
@@ -71,6 +71,8 @@ const Register = () => {
         lastname: lastname,
         email: email,
         createdAt: serverTimestamp(),
+        img_path:
+          "https://res.cloudinary.com/diwwrxy8b/image/upload/v1769641991/jzibxr8wuvqhfqwcnusm.jpg",
       });
 
       router.replace("/auth/Login");

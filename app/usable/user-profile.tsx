@@ -60,7 +60,7 @@ const Profile = () => {
       const friendsSnap = await get("friends").where(
         where("users", "array-contains", userToViewId),
         where("confirmed", "==", true),
-        limit(6)
+        limit(6),
       );
 
       const _friends = friendsSnap.docs.map((f) => {
@@ -80,14 +80,14 @@ const Profile = () => {
       } else {
         const _count = await count("friends").where(
           where("users", "array-contains", userToViewId),
-          where("confirmed", "==", true)
+          where("confirmed", "==", true),
         );
         setFriendsCount(_count);
       }
 
       const postsSnap = await get("posts").where(
         where("creator_id", "==", userToViewId),
-        orderBy("date", "desc")
+        orderBy("date", "desc"),
       );
       const _posts: any = [];
 
@@ -148,7 +148,7 @@ const Profile = () => {
           liked_by_ids: [...liked_by_ids],
           liked: !p.liked,
         };
-      })
+      }),
     );
   };
 
@@ -156,8 +156,8 @@ const Profile = () => {
     setComment("");
     setPosts((prev: any) =>
       prev.map((p: any) =>
-        p.id === id ? { ...p, showComments: !p.showComments } : p
-      )
+        p.id === id ? { ...p, showComments: !p.showComments } : p,
+      ),
     );
   };
 
@@ -182,8 +182,8 @@ const Profile = () => {
               ...p,
               comments: [...p.comments, data],
             }
-          : p
-      )
+          : p,
+      ),
     );
     setComment("");
 
@@ -247,7 +247,12 @@ const Profile = () => {
                     style={styles.profileImage}
                   />
                 ) : (
-                  <FontAwesome name="user" size={50} color={Colors.gray} />
+                  <Image
+                    source={{
+                      uri: "https://res.cloudinary.com/diwwrxy8b/image/upload/v1769641991/jzibxr8wuvqhfqwcnusm.jpg",
+                    }}
+                    style={styles.profileImage}
+                  />
                 )}
               </View>
 
@@ -455,7 +460,7 @@ const Profile = () => {
                     <View style={styles.imageGrid}>
                       {post.img_paths
                         .slice(0, maxImagesToShow)
-                        .map((img, idx) => (
+                        .map((img: any, idx: any) => (
                           <TouchableOpacity
                             key={idx}
                             style={styles.imageWrapper}
@@ -536,12 +541,12 @@ const Profile = () => {
                           style={styles.commentInput}
                           value={post.newComment}
                           onChangeText={(text) =>
-                            setPosts((prev) =>
-                              prev.map((p) =>
+                            setPosts((prev: any) =>
+                              prev.map((p: any) =>
                                 p.id === post.id
                                   ? { ...p, newComment: text }
-                                  : p
-                              )
+                                  : p,
+                              ),
                             )
                           }
                         />

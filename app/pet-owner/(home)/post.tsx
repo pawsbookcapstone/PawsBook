@@ -1,15 +1,15 @@
 import { useAppContext } from "@/AppsProvider";
 import { uploadImageUri } from "@/helpers/cloudinary";
-import { add } from "@/helpers/db";
+import { add, set } from "@/helpers/db";
 import { Colors } from "@/shared/colors/Colors";
 import HeaderWithActions from "@/shared/components/HeaderSet";
 import HeaderLayout from "@/shared/components/MainHeaderLayout";
 import { screens } from "@/shared/styles/styles";
 import { Entypo, FontAwesome6 } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { serverTimestamp } from "firebase/firestore";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Image,
@@ -18,11 +18,14 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  ToastAndroid,
   TouchableOpacity,
   View,
 } from "react-native";
 
 const PostScreen = () => {
+  const [editPost, setEditPost] = useState<any>(null);
+
   const { userId, userName, userImagePath, setFunc } = useAppContext();
 
   const router = useRouter();
@@ -34,20 +37,21 @@ const PostScreen = () => {
   const [taggedPets, setTaggedPets] = useState<
     { id: string; name: string; img_path: string }[]
   >([]);
+  const params = useLocalSearchParams();
 
-  // Update tagged pets when coming back from pet-list
-  // useEffect(() => {
-  //   if (taggedPetsParam) {
-  //     try {
-  //       const parsed = JSON.parse(taggedPetsParam as string);
-  //       if (Array.isArray(parsed)) {
-  //         setTaggedPets(parsed);
-  //       }
-  //     } catch (e) {
-  //       console.warn("Invalid taggedPets param", e);
-  //     }
-  //   }
-  // }, [taggedPetsParam]);
+  useEffect(() => {
+    if (params.editPost) {
+      try {
+        const post = JSON.parse(params.editPost as string);
+        setEditPost(post);
+        setContent(post.body || "");
+        setImages(post.img_paths || []);
+        setTaggedPets(post.pets || []);
+      } catch (e) {
+        console.warn("Invalid editPost param", e);
+      }
+    }
+  }, []);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -80,20 +84,6 @@ const PostScreen = () => {
       return;
     }
 
-    // const newPost = {
-    //   id: Date.now().toString(),
-    //   user: name,
-    //   profileImage: porfile,
-    //   time: "Just now",
-    //   content,
-    //   images,
-    //   taggedPets,
-    //   liked: false,
-    //   likesCount: 0,
-    //   comments: [],
-    //   showComments: false,
-    // };
-
     try {
       let data: any = {
         creator_id: userId,
@@ -103,14 +93,17 @@ const PostScreen = () => {
         date: serverTimestamp(),
         shares: 0,
       };
-      if (taggedPets.length > 0)
+
+      if (taggedPets.length > 0) {
         data.pets = taggedPets.map((p) => ({
           name: p.name,
           id: p.id,
           img_path: p.img_path,
         }));
+      }
+
       if (images.length > 0) {
-        let temp = [];
+        const temp: string[] = [];
         for (const i in images) {
           const img_url = await uploadImageUri(images[i]);
           temp.push(img_url);
@@ -118,12 +111,17 @@ const PostScreen = () => {
         data.img_paths = temp;
       }
 
-      await add("posts").value(data);
+      if (editPost?.id) {
+        // Edit existing post
+        await set("posts", editPost.id).value(data);
+        ToastAndroid.show("Post updated", ToastAndroid.SHORT);
+      } else {
+        // New post
+        await add("posts").value(data);
+        ToastAndroid.show("Post created", ToastAndroid.SHORT);
+      }
+
       router.back();
-      // router.replace({
-      //   pathname: "/pet-owner/(tabs)/home",
-      //   params: { newPost: JSON.stringify(newPost) },
-      // });
     } catch (e) {
       Alert.alert("Error", e + "");
     }
@@ -240,7 +238,9 @@ const PostScreen = () => {
 
         {/* Post Button */}
         <TouchableOpacity style={styles.postButton} onPress={handlePost}>
-          <Text style={styles.postText}>Post</Text>
+          <Text style={styles.postText}>
+            {editPost ? "Update Post" : "Post"}
+          </Text>
         </TouchableOpacity>
       </View>
 

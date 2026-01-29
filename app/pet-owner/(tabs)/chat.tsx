@@ -1,4 +1,5 @@
 import { useAppContext } from "@/AppsProvider";
+import { get } from "@/helpers/db";
 import { db } from "@/helpers/firebase";
 import { computeTimePassed } from "@/helpers/timeConverter";
 import { Colors } from "@/shared/colors/Colors";
@@ -49,47 +50,47 @@ const Chat = () => {
     }, 2000);
   };
 
-  const [onlineUsers] = useState([
-    {
-      id: "1",
-      name: "Sophia",
-      avatar: "https://randomuser.me/api/portraits/women/65.jpg",
-    },
-    {
-      id: "2",
-      name: "James",
-      avatar: "https://randomuser.me/api/portraits/men/41.jpg",
-    },
-    {
-      id: "3",
-      name: "Olivia",
-      avatar: "https://randomuser.me/api/portraits/women/72.jpg",
-    },
-    {
-      id: "4",
-      name: "Liam",
-      avatar: "https://randomuser.me/api/portraits/men/50.jpg",
-    },
-    {
-      id: "5",
-      name: "Emma",
-      avatar: "https://randomuser.me/api/portraits/women/43.jpg",
-    },
-    {
-      id: "6",
-      name: "Noah",
-      avatar: "https://randomuser.me/api/portraits/men/52.jpg",
-    },
-    {
-      id: "7",
-      name: "Ava",
-      avatar: "https://randomuser.me/api/portraits/women/37.jpg",
-    },
-    {
-      id: "8",
-      name: "Mason",
-      avatar: "https://randomuser.me/api/portraits/men/45.jpg",
-    },
+  const [onlineUsers, setOnlineUsers] = useState<any>([
+    // {
+    //   id: "1",
+    //   name: "Sophia",
+    //   avatar: "https://randomuser.me/api/portraits/women/65.jpg",
+    // },
+    // {
+    //   id: "2",
+    //   name: "James",
+    //   avatar: "https://randomuser.me/api/portraits/men/41.jpg",
+    // },
+    // {
+    //   id: "3",
+    //   name: "Olivia",
+    //   avatar: "https://randomuser.me/api/portraits/women/72.jpg",
+    // },
+    // {
+    //   id: "4",
+    //   name: "Liam",
+    //   avatar: "https://randomuser.me/api/portraits/men/50.jpg",
+    // },
+    // {
+    //   id: "5",
+    //   name: "Emma",
+    //   avatar: "https://randomuser.me/api/portraits/women/43.jpg",
+    // },
+    // {
+    //   id: "6",
+    //   name: "Noah",
+    //   avatar: "https://randomuser.me/api/portraits/men/52.jpg",
+    // },
+    // {
+    //   id: "7",
+    //   name: "Ava",
+    //   avatar: "https://randomuser.me/api/portraits/women/37.jpg",
+    // },
+    // {
+    //   id: "8",
+    //   name: "Mason",
+    //   avatar: "https://randomuser.me/api/portraits/men/45.jpg",
+    // },
   ]);
 
   const [messages, setMessages] = useState<any>([
@@ -170,12 +171,30 @@ const Chat = () => {
       );
     });
 
+    get("users")
+      .where(where("online", "==", true))
+      .then(({ docs }) =>
+        setOnlineUsers(
+          docs
+            .map((res) => {
+              const d = res.data();
+              return {
+                id: res.id,
+                name: `${d.firstname} ${d.lastname}`,
+                avatar: d.img_path,
+              };
+            })
+            .filter((v) => v.id !== userId),
+        ),
+      );
+
     return () => {
       unsubscribe();
     };
   }, []);
 
   const handleChat = (chat: any) => {
+    console.log(chat);
     if (chat.type === "group") {
       router.push({
         pathname: "/pet-owner/(chat)/group-chat",
@@ -252,7 +271,7 @@ const Chat = () => {
                 contentContainerStyle={styles.onlineRow}
                 style={{ marginBottom: 8 }}
               >
-                {onlineUsers.map((user) => (
+                {onlineUsers.map((user: any) => (
                   <Pressable
                     key={user.id}
                     style={styles.onlineUser}
@@ -260,7 +279,7 @@ const Chat = () => {
                       handleChat({
                         id: user.id,
                         name: user.name,
-                        avatar: user.avatar,
+                        img_path: user.avatar,
                         message: "",
                         lastMessage: "",
                         time: "",

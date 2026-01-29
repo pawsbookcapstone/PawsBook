@@ -22,6 +22,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -51,7 +52,7 @@ const ChatField = () => {
   useEffect(() => {
     const createDetails = async () => {
       const snap = await find("chats", chatId);
-      console.log("sfsdf");
+      console.log("chat:", otherUserId, otherUserName, otherUserImgPath);
 
       if (snap.exists() && snap.data().last_sent_at) return;
 
@@ -71,7 +72,7 @@ const ChatField = () => {
 
     const messageQuery = query(
       collection(db, "chats", chatId, "messages"),
-      orderBy("sent_at", "asc")
+      orderBy("sent_at", "asc"),
     );
     const unsubscribe = onSnapshot(messageQuery, (snapshot) => {
       setMessages(snapshot.docs.map((f) => ({ id: f.id, ...f.data() })));
@@ -148,6 +149,18 @@ const ChatField = () => {
     // }, 100);
   };
 
+  const handleSeeProfile = () => {
+    if (otherUserId === userId) {
+      router.push("/pet-owner/profile");
+      return;
+    }
+
+    router.push({
+      pathname: "/usable/user-profile",
+      params: { userToViewId: otherUserId },
+    });
+  };
+
   const renderMessage = ({ item }: any) => {
     const isMe = item.sender_id === userId;
     return (
@@ -162,9 +175,17 @@ const ChatField = () => {
           </Text>
         ) : null}
 
-        {item.img_path ? (
-          <Image source={{ uri: item.img_path }} style={styles.chatImage} />
-        ) : null}
+        {
+          item.img_path ? (
+            <Image source={{ uri: item.img_path }} style={styles.chatImage} />
+          ) : null
+          // <Image
+          //   source={{
+          //     uri: "https://res.cloudinary.com/diwwrxy8b/image/upload/v1769641991/jzibxr8wuvqhfqwcnusm.jpg",
+          //   }}
+          //   style={styles.chatImage}
+          // />
+        }
       </View>
     );
   };
@@ -178,10 +199,15 @@ const ChatField = () => {
             <MaterialIcons name="arrow-back-ios" size={20} color="black" />
           </TouchableOpacity>
 
-          <View style={styles.userInfo}>
-            <Image source={{ uri: otherUserImgPath }} style={styles.avatar} />
-            <Text style={styles.userName}>{otherUserName}</Text>
-          </View>
+          <Pressable
+            onPress={() => handleSeeProfile()}
+            // style={styles.followButton}
+          >
+            <View style={styles.userInfo}>
+              <Image source={{ uri: otherUserImgPath }} style={styles.avatar} />
+              <Text style={styles.userName}>{otherUserName}</Text>
+            </View>
+          </Pressable>
 
           <FontAwesome6
             name="video"

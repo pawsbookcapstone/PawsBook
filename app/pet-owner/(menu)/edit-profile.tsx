@@ -1,6 +1,7 @@
 import { useAppContext } from "@/AppsProvider";
 import { uploadImageUri } from "@/helpers/cloudinary";
 import { find, set } from "@/helpers/db";
+import { updateUserProfile } from "@/helpers/updateProfile";
 import { Colors } from "@/shared/colors/Colors";
 import HeaderWithActions from "@/shared/components/HeaderSet";
 import HeaderLayout from "@/shared/components/MainHeaderLayout";
@@ -127,6 +128,11 @@ const EditProfile = () => {
       setUserFirstName(data.firstname);
       setUserLastName(data.lastname);
       set("users", userId).value(data);
+      updateUserProfile(
+        userId,
+        `${data.firstname} ${data.lastname}`,
+        data.img_path,
+      );
       router.back();
     } catch (e) {
       Alert.alert("Error", e + "");

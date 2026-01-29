@@ -106,6 +106,7 @@ const Notifications = () => {
       });
 
       setData(notifications);
+      console.log("notification:", notifications);
     } catch (error) {
       console.log("Error fetching notifications:", error);
     } finally {

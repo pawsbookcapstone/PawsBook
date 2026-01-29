@@ -1,3 +1,4 @@
+import { getUserSavedItems, remove } from "@/helpers/db";
 import { Colors } from "@/shared/colors/Colors";
 import HeaderWithActions from "@/shared/components/HeaderSet";
 import HeaderLayout from "@/shared/components/MainHeaderLayout";
@@ -17,36 +18,54 @@ import {
 } from "react-native";
 
 import { useAppContext } from "@/AppsProvider";
-import { db } from "@/helpers/firebase";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
 
-
-type MarketplaceItem = {
+type BaseSavedItem = {
   id: string;
-  name: string;
-  price: string;
+  saveCategory: "posts" | "marketplace" | "adopt";
   images: string[];
-  description: string;
 };
 
-type PostItem = {
-  id: string;
+type PostItem = BaseSavedItem & {
+  saveCategory: "posts";
   title: string;
-  images: string[];
   description: string;
   time: string;
 };
 
-type SavedItem = PostItem | MarketplaceItem;
+type MarketplaceItem = BaseSavedItem & {
+  saveCategory: "marketplace";
+  name: string;
+  price: string;
+  description: string;
+  ownerId?: string;
+  ownerName: string;
+  ownerImage: string;
+};
+
+type AdoptItem = BaseSavedItem & {
+  saveCategory: "adopt";
+  caption: string;
+  petCategory: string;
+  petImage: string;
+  ownerId?: string;
+  ownerName: string;
+  ownerImage: string;
+};
+
+type SavedItem = PostItem | MarketplaceItem | AdoptItem;
 
 const Saved = () => {
   const router = useRouter();
   const { userId } = useAppContext();
 
-  const [activeTab, setActiveTab] = useState<"Posts" | "Marketplace">("Posts");
+  const [activeTab, setActiveTab] = useState<
+    "Posts" | "Marketplace" | "Adoption"
+  >("Posts");
 
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [marketplace, setMarketplace] = useState<MarketplaceItem[]>([]);
+  const [adopt, setAdopt] = useState<AdoptItem[]>([]);
+  const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
 
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [loadingMarketplace, setLoadingMarketplace] = useState(true);
@@ -59,35 +78,90 @@ const Saved = () => {
 
   // Fetch saved marketplace items
   useEffect(() => {
-    const fetchSavedMarketplace = async () => {
+    const fetchSavedItems = async () => {
       if (!userId) return;
 
       try {
         setLoadingMarketplace(true);
-        const savedRef = collection(db, "users", userId, "savedItems");
-        const q = query(savedRef, orderBy("savedAt", "desc"));
-        const snapshot = await getDocs(q);
 
-        const items: MarketplaceItem[] = snapshot.docs.map(doc => {
+        const snapshot = await getUserSavedItems(userId).where();
+
+        const normalizeImages = (data: any): string[] => {
+          if (Array.isArray(data.images) && data.images.length > 0) {
+            return data.images;
+          }
+
+          if (typeof data.images === "string" && data.images.trim() !== "") {
+            return [data.images];
+          }
+
+          if (data.images && typeof data.images === "object") {
+            return Object.values(data.images).filter(
+              (url) => typeof url === "string",
+            );
+          }
+
+          if (data.petImage) return [data.petImage];
+          if (data.ownerImage) return [data.ownerImage];
+
+          return [];
+        };
+
+        const items: SavedItem[] = snapshot.docs.map((doc) => {
           const data = doc.data();
-          return {
-            id: doc.id,
-            name: data.title || "No title",
-            price: data.price ? String(data.price) : "$0",
-            images: Array.isArray(data.images) ? data.images : [],
-            description: data.description || "",
-          };
-        });
+          const images = normalizeImages(data);
 
-        setMarketplace(items);
+          switch (data.saveCategory) {
+            case "marketplace":
+              return {
+                id: doc.id,
+                saveCategory: "marketplace",
+                images,
+                name: data.title ?? "No title",
+                price: data.price ? String(data.price) : "0",
+                description: data.description ?? "",
+                ownerId: data.ownerId,
+                ownerName: data.ownerName ?? "",
+                ownerImage: data.ownerImage ?? "",
+              };
+
+            case "posts":
+              return {
+                id: doc.id,
+                saveCategory: "posts",
+                images,
+                title: data.title ?? "",
+                description: data.description ?? "",
+                time: data.time ?? "",
+              };
+
+            case "adopt":
+              return {
+                id: doc.id,
+                saveCategory: "adopt",
+                images,
+                caption: data.caption ?? "",
+                petCategory: data.petCategory ?? "",
+                petImage: data.petImage ?? "",
+                ownerId: data.ownerId,
+                ownerName: data.ownerName ?? "",
+                ownerImage: data.ownerImage ?? "",
+              };
+
+            default:
+              throw new Error(`Unknown saveCategory: ${data.saveCategory}`);
+          }
+        });
+        console.log(items);
+        setSavedItems(items);
       } catch (error) {
-        console.error("Error fetching saved marketplace items:", error);
+        console.error("Error fetching saved items:", error);
       } finally {
         setLoadingMarketplace(false);
       }
     };
 
-    fetchSavedMarketplace();
+    fetchSavedItems();
   }, [userId]);
 
   // Placeholder posts fetch - replace with your own logic if you have saved posts
@@ -118,55 +192,98 @@ const Saved = () => {
     setImageModalVisible(true);
   };
 
-  const removeItem = (id: string) => {
-    if (activeTab === "Posts") setPosts(posts.filter(p => p.id !== id));
-    else setMarketplace(marketplace.filter(m => m.id !== id));
+  const removeItem = async (id: string) => {
+    try {
+      // Delete from Firestore
+      await remove("users", userId, "savedItems", id);
+
+      // Remove locally
+      setSavedItems((prev) => prev.filter((item) => item.id !== id));
+      alert("Saved removed!");
+    } catch (error) {
+      console.error("Failed to delete saved item:", error);
+      alert("Failed to remove item. Please try again.");
+    }
   };
 
   const renderItem = ({ item }: { item: SavedItem }) => {
-    const images =
-      activeTab === "Posts"
-        ? (item as PostItem).images
-        : (item as MarketplaceItem).images;
+    let images: string[] = [];
+    let title = "";
+    let description = "";
+    let extraInfo: React.ReactNode = null;
+
+    switch (item.saveCategory) {
+      case "posts": {
+        const post = item as PostItem;
+        images = post.images;
+        title = post.title;
+        description = post.description;
+        extraInfo = <Text style={styles.time}>{post.time}</Text>;
+        break;
+      }
+
+      case "marketplace": {
+        const market = item as MarketplaceItem;
+        images = market.images;
+        title = market.name;
+        description = market.description;
+        extraInfo = (
+          <View style={styles.ownerRow}>
+            <Image
+              source={{ uri: market.ownerImage }}
+              style={styles.ownerImage}
+            />
+            <Text style={styles.price}>{market.price}</Text>;
+            <Text style={styles.ownerName}>{market.ownerName}</Text>
+          </View>
+        );
+
+        break;
+      }
+
+      case "adopt": {
+        const adopt = item as AdoptItem;
+        images = adopt.petImage ? [adopt.petImage] : [];
+        title = adopt.caption;
+        description = adopt.petCategory;
+        extraInfo = (
+          <View style={styles.ownerRow}>
+            <Image
+              source={{ uri: adopt.ownerImage }}
+              style={styles.ownerImage}
+            />
+            <Text style={styles.ownerName}>{adopt.ownerName}</Text>
+          </View>
+        );
+        break;
+      }
+    }
 
     return (
       <View style={styles.card}>
         {images.length > 0 && (
           <View style={styles.imageGrid}>
-            {images.slice(0, 3).map((img, idx) => {
-              const extraImages = images.length - 3;
-              return (
-                <TouchableOpacity
-                  key={idx}
-                  style={styles.imageWrapper}
-                  onPress={() => openImageModal(images, idx)}
-                  activeOpacity={0.8}
-                >
-                  <Image
-                    source={{ uri: img }}
-                    style={styles.gridImage}
-                    resizeMode="cover"
-                  />
-                  {idx === 2 && extraImages > 0 && (
-                    <View style={styles.overlay}>
-                      <Text style={styles.overlayText}>+{extraImages}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
+            {images.slice(0, 3).map((img, idx) => (
+              <TouchableOpacity
+                key={idx}
+                style={styles.imageWrapper}
+                onPress={() => openImageModal(images, idx)}
+                activeOpacity={0.8}
+              >
+                <Image
+                  source={{ uri: img }}
+                  style={styles.gridImage}
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
+            ))}
           </View>
         )}
 
         <View style={styles.content}>
-          <Text style={styles.title}>
-            {activeTab === "Posts"
-              ? (item as PostItem).title
-              : (item as MarketplaceItem).name}
-          </Text>
-          <Text style={styles.description}>{item.description}</Text>
-          {activeTab === "Posts" && <Text style={styles.time}>{(item as PostItem).time}</Text>}
-          {activeTab === "Marketplace" && <Text style={styles.price}>{(item as MarketplaceItem).price}</Text>}
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.description}>{description}</Text>
+          {extraInfo}
         </View>
 
         <TouchableOpacity
@@ -195,30 +312,74 @@ const Saved = () => {
           style={[styles.tabButton, activeTab === "Posts" && styles.activeTab]}
           onPress={() => setActiveTab("Posts")}
         >
-          <Text style={[styles.tabText, activeTab === "Posts" && styles.activeTabText]}>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "Posts" && styles.activeTabText,
+            ]}
+          >
             Posts
           </Text>
         </TouchableOpacity>
+
         <TouchableOpacity
-          style={[styles.tabButton, activeTab === "Marketplace" && styles.activeTab]}
+          style={[
+            styles.tabButton,
+            activeTab === "Marketplace" && styles.activeTab,
+          ]}
           onPress={() => setActiveTab("Marketplace")}
         >
-          <Text style={[styles.tabText, activeTab === "Marketplace" && styles.activeTabText]}>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "Marketplace" && styles.activeTabText,
+            ]}
+          >
             Marketplace
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === "Adoption" && styles.activeTab,
+          ]}
+          onPress={() => setActiveTab("Adoption")}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "Adoption" && styles.activeTabText,
+            ]}
+          >
+            Adopt
           </Text>
         </TouchableOpacity>
       </View>
 
       {/* List */}
       <FlatList
-        data={activeTab === "Posts" ? posts : marketplace}
-        keyExtractor={item => item.id}
+        data={savedItems.filter((item) => {
+          switch (activeTab) {
+            case "Posts":
+              return item.saveCategory === "posts";
+            case "Marketplace":
+              return item.saveCategory === "marketplace";
+            case "Adoption":
+              return item.saveCategory === "adopt";
+            default:
+              return false;
+          }
+        })}
+        keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={{ padding: 16, paddingBottom: 30 }}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No saved items in this category.</Text>
+            <Text style={styles.emptyText}>
+              No saved items in this category.
+            </Text>
           </View>
         }
       />
@@ -240,7 +401,11 @@ const Saved = () => {
               keyExtractor={(_, i) => i.toString()}
               renderItem={({ item }) => (
                 <View style={styles.fullImageWrapper}>
-                  <Image source={{ uri: item }} style={styles.fullImage} resizeMode="contain" />
+                  <Image
+                    source={{ uri: item }}
+                    style={styles.fullImage}
+                    resizeMode="contain"
+                  />
                 </View>
               )}
             />
@@ -393,5 +558,24 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 20,
     fontWeight: "bold",
+  },
+  ownerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+  },
+
+  ownerImage: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginRight: 8,
+    backgroundColor: "#E5E7EB", // placeholder gray
+  },
+
+  ownerName: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#374151", // neutral dark
   },
 });

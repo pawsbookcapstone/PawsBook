@@ -21,8 +21,18 @@ const screenWidth = Dimensions.get("window").width;
 
 const ItemDetails = () => {
   const router = useRouter();
-  const { id, name, price, description, image, location, seller, sellerImage } =
-    useLocalSearchParams();
+  const {
+    id,
+    name,
+    price,
+    description,
+    image,
+    location,
+    seller,
+    sellerImage,
+    saveCategory,
+    otherUserId,
+  } = useLocalSearchParams();
 
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -36,25 +46,43 @@ const ItemDetails = () => {
     }
   })();
 
-
   const { userId } = useAppContext(); // current logged-in user
 
-const handleSaveItem = async () => {
-  if (!userId) {
-    alert("You must be logged in to save items.");
-    return;
-  }
+  const handleSaveItem = async () => {
+    if (!userId) {
+      alert("You must be logged in to save items.");
+      return;
+    }
 
-  await saveItemForUser(userId, {
-    id: id as string,
-    title: name as string,
-    price: Number(price),
-    images: images as string[],
-    ownerId: seller as string,
-  });
+    await saveItemForUser(userId, {
+      id: id as string,
+      title: name as string,
+      price: Number(price),
+      images: images as string[],
+      ownerId: otherUserId as string,
+      ownerName: seller as string,
+      ownerImage: sellerImage as string,
+      saveCategory: saveCategory as string,
+      description: description as string,
+    });
 
-  alert("Item saved to your collection!");
-};
+    alert("Item saved to your collection!");
+  };
+
+  const handleChat = () => {
+    console.log(id, seller, sellerImage);
+    router.push({
+      pathname: "/pet-owner/(chat)/chat-field",
+      params: {
+        // userId: userId,
+        // userImagePath: ownerImage,
+        // userName: ownerName,
+        otherUserId: otherUserId,
+        otherUserName: seller,
+        otherUserImgPath: sellerImage,
+      },
+    });
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
@@ -118,7 +146,7 @@ const handleSaveItem = async () => {
             <Text style={[styles.buttonText, { color: "#000" }]}>Save</Text>
           </Pressable>
 
-          <Pressable style={styles.Button}>
+          <Pressable style={styles.Button} onPress={handleChat}>
             <Ionicons name="chatbubble" size={20} color={"#fff"} />
             <Text style={styles.buttonText}>Message</Text>
           </Pressable>

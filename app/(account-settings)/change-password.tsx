@@ -4,6 +4,12 @@ import HeaderLayout from "@/shared/components/MainHeaderLayout";
 import { screens } from "@/shared/styles/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import {
+  EmailAuthProvider,
+  getAuth,
+  reauthenticateWithCredential,
+  updatePassword,
+} from "firebase/auth";
 import React, { useState } from "react";
 import {
   Pressable,
@@ -23,6 +29,40 @@ const ChangePassword = () => {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  const auth = getAuth();
+
+  async function changePassword() {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const credential = EmailAuthProvider.credential(
+      user.email ?? "",
+      currentPassword,
+    );
+
+    try {
+      // ✅ THIS checks the current password
+      await reauthenticateWithCredential(user, credential);
+
+      // ✅ Only runs if password is correct
+      await updatePassword(user, newPassword);
+
+      console.log("Password changed successfully");
+      return true;
+    } catch (error: any) {
+      if (error.code === "auth/wrong-password") {
+        console.error("Current password is incorrect");
+      } else if (error.code === "auth/weak-password") {
+        console.error("New password is too weak");
+      } else if (error.code === "auth/requires-recent-login") {
+        console.error("Please login again");
+      } else {
+        console.error(error.message);
+      }
+      return false;
+    }
+  }
+
   const handleChangePassword = () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
       alert("Please fill out all fields.");
@@ -34,7 +74,8 @@ const ChangePassword = () => {
       return;
     }
 
-    // TODO: Implement backend update logic here
+    if (!changePassword()) return;
+
     alert("Your password has been successfully updated!");
     router.back();
   };
